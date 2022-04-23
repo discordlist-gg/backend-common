@@ -12,6 +12,7 @@ chrono = "0.4"
 
 struct-field-names-as-array = "0.1"
 
+strum = { version = "0.24", features = ["derive"] }
 url = { version = "2", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
 poem-openapi = { version = "1.3", features = ["redoc", "uuid", "url", "chrono"] }
