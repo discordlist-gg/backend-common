@@ -17,7 +17,7 @@ use url::Url;
 
 #[cfg_attr(feature = "bincode", derive(Decode, Encode))]
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub struct DiscordUrl(#[bincode(with_serde)] pub Url);
+pub struct DiscordUrl(#[cfg_attr(feature = "bincode", bincode(with_serde))] pub Url);
 
 impl serde::Serialize for DiscordUrl {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
