@@ -93,7 +93,13 @@ impl ParseFromJSON for DiscordUrl {
         let value = value.ok_or_else(|| ParseError::custom("invalid invite given"))?;
 
         if let Some(v) = value.as_str() {
-            let url = Url::from_str(v)?;
+            let v = if !v.starts_with("https://") {
+                format!("https://{}", v)
+            } else {
+                v.to_string()
+            };
+
+            let url = Url::from_str(&v)?;
             return Ok(Self(url));
         }
 
