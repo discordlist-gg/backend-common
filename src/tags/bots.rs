@@ -33,8 +33,8 @@ use crate::tags::IntoFilter;
 #[strum(serialize_all = "kebab_case", ascii_case_insensitive)]
 #[serde(rename_all = "kebab-case")]
 pub enum BotTags {
-    Multilanguage,
-    Knowledgebase,
+    MultiLanguage,
+    KnowledgeBase,
     ReactionRole,
     Math,
     Terraria,
@@ -56,7 +56,7 @@ pub enum BotTags {
     French,
     Reddit,
     Reminders,
-    TextToSpeach,
+    TextToSpeech,
     Animation,
     Chinese,
     Playstation,
@@ -70,7 +70,7 @@ pub enum BotTags {
     Inventory,
     Wikipedia,
     Twitter,
-    Chatbot,
+    ChatBot,
     Minecraft,
     Instagram,
     Research,
@@ -103,17 +103,20 @@ pub enum BotTags {
     LocalNews,
     Spanish,
     AutoRole,
+
+    #[strum(serialize = "osu!")]
+    #[serde(rename = "osu!")]
     Osu,
     Eris,
     Hosting,
     AmongUs,
     Youtube,
-    Customcommands,
+    CustomCommands,
     Courses,
     Csgo,
     Leaderboards,
     Opensource,
-    Profanityfilter,
+    ProfanityFilter,
     Sword,
     Rewards,
     RaidProof,
