@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt::{Debug, Formatter};
+use std::ops::Deref;
 use std::sync::Arc;
 use arc_swap::ArcSwap;
 
@@ -34,6 +35,14 @@ pub fn set_bot_tags(lookup: BTreeMap<String, Flag>) {
 #[derive(Default, Clone)]
 pub struct BotTags {
     inner: Vec<String>,
+}
+
+impl Deref for BotTags {
+    type Target = Vec<String>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
 }
 
 impl Debug for BotTags {
