@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 use arc_swap::ArcSwap;
 
@@ -29,9 +30,16 @@ pub fn set_bot_tags(lookup: BTreeMap<String, Flag>) {
 }
 
 
-#[derive(Default)]
+#[cfg_attr(feature = "bincode", derive(Encode, Decode))]
+#[derive(Default, Clone)]
 pub struct BotTags {
     inner: Vec<String>,
+}
+
+impl Debug for BotTags {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.inner)
+    }
 }
 
 impl Type for BotTags {

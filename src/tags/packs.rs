@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 use arc_swap::ArcSwap;
 
@@ -27,9 +28,15 @@ pub fn set_pack_tags(lookup: BTreeMap<String, Flag>) {
 }
 
 #[cfg_attr(feature = "bincode", derive(Encode, Decode))]
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct PackTags {
     inner: Vec<String>,
+}
+
+impl Debug for PackTags {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.inner)
+    }
 }
 
 impl Type for PackTags {
