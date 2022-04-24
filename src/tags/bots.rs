@@ -13,6 +13,7 @@ use poem_openapi::types::{ParseError, ParseFromJSON, ParseResult, ToJSON, Type};
 use scylla::cql_to_rust::{FromCqlVal, FromCqlValError};
 use scylla::frame::response::result::CqlValue;
 use scylla::frame::value::{Value, ValueTooBig};
+use serde::{Deserializer, Serializer};
 
 use crate::tags::handler::from_named_flags;
 use crate::tags::{Flag, IntoFilter, to_named_flags};
@@ -39,6 +40,25 @@ pub struct BotTags {
 impl Debug for BotTags {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self.inner)
+    }
+}
+
+impl serde::Serialize for BotTags {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        self.inner.serialize(serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for BotTags {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: Deserializer<'de>
+    {
+        let inner: Vec<String> = Vec::deserialize(deserializer)?;
+        Ok(Self {
+            inner
+        })
     }
 }
 
