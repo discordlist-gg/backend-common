@@ -66,17 +66,13 @@ impl Type for PackTags {
 impl ParseFromJSON for PackTags {
     fn parse_from_json(value: Option<serde_json::Value>) -> ParseResult<Self> {
         if let Some(val) = value {
-            let flags = match val {
-                serde_json::Value::Array(v) => v,
+            let flag = match val {
+                serde_json::Value::String(v) => v,
                 other => return Err(ParseError::custom(format!("Cannot derive tags from {:?}", &other))),
             };
 
-            let inner = flags.into_iter()
-                .flat_map(|v| v.as_str().map(|v| v.to_string()))
-                .collect();
-
             Ok(Self {
-                inner
+                inner: vec![flag]
             })
         } else {
             Err(ParseError::custom("Cannot derive tags from null."))
