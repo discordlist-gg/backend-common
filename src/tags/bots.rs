@@ -1,182 +1,50 @@
 use std::borrow::Cow;
-use std::str::FromStr;
+use std::collections::BTreeMap;
+use std::sync::Arc;
+use arc_swap::ArcSwap;
 
 #[cfg(feature = "bincode")]
 use bincode::{Decode, Encode};
+use once_cell::sync::OnceCell;
 
-use poem_openapi::registry::{MetaSchema, MetaSchemaRef};
+use poem_openapi::registry::MetaSchemaRef;
 use poem_openapi::types::{ParseError, ParseFromJSON, ParseResult, ToJSON, Type};
 use scylla::cql_to_rust::{FromCqlVal, FromCqlValError};
 use scylla::frame::response::result::CqlValue;
 use scylla::frame::value::{Value, ValueTooBig};
-use strum::{AsRefStr, Display, EnumIter, EnumString, EnumVariantNames, IntoStaticStr};
 
-use crate::tags::IntoFilter;
+use crate::tags::handler::from_named_flags;
+use crate::tags::{Flag, IntoFilter, to_named_flags};
 
-#[cfg_attr(feature = "bincode", derive(Encode, Decode))]
-#[derive(
-    Copy,
-    Clone,
-    EnumString,
-    EnumIter,
-    AsRefStr,
-    Display,
-    EnumVariantNames,
-    IntoStaticStr,
-    Debug,
-    serde::Serialize,
-    serde::Deserialize,
-    PartialEq,
-    Eq,
-    Hash,
-)]
-#[strum(serialize_all = "kebab_case", ascii_case_insensitive)]
-#[serde(rename_all = "kebab-case")]
-pub enum BotTags {
-    MultiLanguage,
-    KnowledgeBase,
-    ReactionRole,
-    Math,
-    Terraria,
-    AutoModeration,
-    AnimalCrossing,
-    Learn,
-    Italian,
-    Scripting,
-    Roleplay,
-    Interactive,
-    Stores,
-    InviteTracking,
-    Weather,
-    Counting,
-    Valorant,
-    NearbyServices,
-    Turkish,
-    Fortnite,
-    French,
-    Reddit,
-    Reminders,
-    TextToSpeech,
-    Animation,
-    Chinese,
-    Playstation,
-    Memes,
-    Friends,
-    Pubg,
-    Pokemon,
-    Tracking,
-    MiniGames,
-    Verification,
-    Inventory,
-    Wikipedia,
-    Twitter,
-    ChatBot,
-    Minecraft,
-    Instagram,
-    Research,
-    Japanese,
-    Antispam,
-    Nyx,
-    Rust,
-    Nintendo,
-    German,
-    Gambling,
-    Xbox,
-    Games,
-    Gta,
-    Github,
-    RoleManagement,
-    Rpg,
-    GamingNews,
-    Calculator,
-    FallGuys,
-    Image,
-    Russian,
-    Twitch,
-    Video,
-    Documentation,
-    Music,
-    Webhooks,
-    AssassinsCreed,
-    TipsTricks,
-    Hytale,
-    LocalNews,
-    Spanish,
-    AutoRole,
 
-    #[strum(serialize = "osu!")]
-    #[serde(rename = "osu!")]
-    Osu,
-    Eris,
-    Hosting,
-    AmongUs,
-    Youtube,
-    CustomCommands,
-    Courses,
-    Csgo,
-    Leaderboards,
-    Opensource,
-    ProfanityFilter,
-    Sword,
-    Rewards,
-    RaidProof,
-    Dutch,
-    Translation,
-    Robbing,
-    ApexLegends,
-    CustomizableBehavior,
-    Romanian,
-    English,
-    Soundboard,
-    Templates,
-    Religion,
-    Logging,
-    Swedish,
-    LitCord,
-    SeaOfThieves,
-    Programming,
-    CustomizableFilter,
-    Cryptocurrency,
-    Gif,
-    Norwegian,
-    RocketLeague,
-    Ticketing,
-    Survey,
-    Roblox,
-    ServerManagement,
-    Steam,
-    Trivia,
-    Anime,
-    Meme,
-    Game,
-    Fun,
-    Economy,
-    Utility,
-    Moderation,
-    Leveling,
-    League,
-    Overwatch,
-    Management,
-    Media,
-    Runescape,
-    Web,
-    Customizable,
-    Social,
-    Stream,
-    Dashboard,
+static LOADED_BOT_TAGS: OnceCell<ArcSwap<BTreeMap<String, Flag>>> = OnceCell::new();
+
+pub fn get_bot_tags() -> &'static ArcSwap<BTreeMap<String, Flag>> {
+    LOADED_BOT_TAGS.get_or_init(ArcSwap::default)
+}
+
+pub fn set_bot_tags(lookup: BTreeMap<String, Flag>) {
+    let swap = LOADED_BOT_TAGS.get_or_init(ArcSwap::default);
+    swap.store(Arc::new(lookup));
+}
+
+
+#[derive(Default)]
+pub struct BotTags {
+    inner: Vec<String>,
 }
 
 impl Type for BotTags {
     const IS_REQUIRED: bool = false;
     type RawValueType = Self;
-    type RawElementValueType = Self;
+    type RawElementValueType = <Vec<String> as Type>::RawElementValueType;
 
     fn name() -> Cow<'static, str> {
-        Cow::from("BotTag")
+        Cow::from("Tags<BotTag>")
     }
 
     fn schema_ref() -> MetaSchemaRef {
-        MetaSchemaRef::Inline(Box::new(MetaSchema::new("BotTags")))
+        Vec::<String>::schema_ref()
     }
 
     fn as_raw_value(&self) -> Option<&Self::RawValueType> {
@@ -186,56 +54,232 @@ impl Type for BotTags {
     fn raw_element_iter<'a>(
         &'a self,
     ) -> Box<dyn Iterator<Item = &'a Self::RawElementValueType> + 'a> {
-        Box::new(vec![self].into_iter())
+        self.inner.raw_element_iter()
     }
 }
 
 impl ParseFromJSON for BotTags {
     fn parse_from_json(value: Option<serde_json::Value>) -> ParseResult<Self> {
-        if let Some(v) = value {
-            match v {
-                serde_json::Value::String(v) => {
-                    Self::from_str(&v).map_err(ParseError::custom)
-                },
-                _ => Err(ParseError::custom("Invalid tag")),
-            }
+        if let Some(val) = value {
+            let flags = match val {
+                serde_json::Value::Array(v) => v,
+                other => return Err(ParseError::custom(format!("Cannot derive tags from {:?}", &other))),
+            };
+
+            let inner = flags.into_iter()
+                .flat_map(|v| v.as_str().map(|v| v.to_string()))
+                .collect();
+
+            Ok(Self {
+                inner
+            })
         } else {
-            Err(ParseError::custom("Invalid tag"))
+            Err(ParseError::custom("Cannot derive tags from null."))
         }
     }
 }
 
 impl ToJSON for BotTags {
     fn to_json(&self) -> Option<serde_json::Value> {
-        Some(self.to_string().into())
+        self.inner.to_json()
     }
 }
 
 impl Value for BotTags {
     fn serialize(&self, buf: &mut Vec<u8>) -> Result<(), ValueTooBig> {
-        let s: &str = self.as_ref();
-        s.serialize(buf)
+        let lookup = get_bot_tags();
+        let flags = from_named_flags(&self.inner, lookup.load().as_ref());
+
+        CqlValue::Varint(flags).serialize(buf)?;
+
+        Ok(())
     }
 }
 
 impl FromCqlVal<CqlValue> for BotTags {
     fn from_cql(cql_val: CqlValue) -> Result<Self, FromCqlValError> {
-        let data = match cql_val {
-            CqlValue::Text(tag) => {
-                Self::from_str(&tag).map_err(|_| FromCqlValError::BadCqlType)?
-            },
-            _ => return Err(FromCqlValError::BadCqlType),
+        let inst = if let CqlValue::Varint(flags) = cql_val {
+            let lookup = get_bot_tags();
+            let inner = to_named_flags(&flags, lookup.load().as_ref());
+            Self { inner }
+        } else {
+            Self::default()
         };
 
-        Ok(data)
+        Ok(inst)
     }
 }
 
-impl IntoFilter for Vec<BotTags> {
+impl IntoFilter for BotTags {
     #[inline]
     fn into_filter(self) -> Vec<String> {
-        self.into_iter()
-            .map(|v| format!("tags = {:?}", v.to_string()))
+        self.inner
+            .iter()
+            .map(|v| format!("tags = {:?}", v))
             .collect()
     }
 }
+
+
+// #[cfg_attr(feature = "bincode", derive(Encode, Decode))]
+// #[derive(
+//     Copy,
+//     Clone,
+//     EnumString,
+//     EnumIter,
+//     AsRefStr,
+//     Display,
+//     EnumVariantNames,
+//     IntoStaticStr,
+//     Debug,
+//     serde::Serialize,
+//     serde::Deserialize,
+//     PartialEq,
+//     Eq,
+//     Hash,
+// )]
+// #[strum(serialize_all = "kebab_case", ascii_case_insensitive)]
+// #[serde(rename_all = "kebab-case")]
+// pub enum BotTags {
+//     MultiLanguage,
+//     KnowledgeBase,
+//     ReactionRole,
+//     Math,
+//     Terraria,
+//     AutoModeration,
+//     AnimalCrossing,
+//     Learn,
+//     Italian,
+//     Scripting,
+//     Roleplay,
+//     Interactive,
+//     Stores,
+//     InviteTracking,
+//     Weather,
+//     Counting,
+//     Valorant,
+//     NearbyServices,
+//     Turkish,
+//     Fortnite,
+//     French,
+//     Reddit,
+//     Reminders,
+//     TextToSpeech,
+//     Animation,
+//     Chinese,
+//     Playstation,
+//     Memes,
+//     Friends,
+//     Pubg,
+//     Pokemon,
+//     Tracking,
+//     MiniGames,
+//     Verification,
+//     Inventory,
+//     Wikipedia,
+//     Twitter,
+//     ChatBot,
+//     Minecraft,
+//     Instagram,
+//     Research,
+//     Japanese,
+//     Antispam,
+//     Nyx,
+//     Rust,
+//     Nintendo,
+//     German,
+//     Gambling,
+//     Xbox,
+//     Games,
+//     Gta,
+//     Github,
+//     RoleManagement,
+//     Rpg,
+//     GamingNews,
+//     Calculator,
+//     FallGuys,
+//     Image,
+//     Russian,
+//     Twitch,
+//     Video,
+//     Documentation,
+//     Music,
+//     Webhooks,
+//     AssassinsCreed,
+//     TipsTricks,
+//     Hytale,
+//     LocalNews,
+//     Spanish,
+//     AutoRole,
+//
+//     #[strum(serialize = "osu!")]
+//     #[serde(rename = "osu!")]
+//     Osu,
+//     Eris,
+//     Hosting,
+//     AmongUs,
+//     Youtube,
+//     CustomCommands,
+//     Courses,
+//     Csgo,
+//     Leaderboards,
+//     Opensource,
+//     ProfanityFilter,
+//     Sword,
+//     Rewards,
+//     RaidProof,
+//     Dutch,
+//     Translation,
+//     Robbing,
+//     ApexLegends,
+//     CustomizableBehavior,
+//     Romanian,
+//     English,
+//     Soundboard,
+//     Templates,
+//     Religion,
+//     Logging,
+//     Swedish,
+//     LitCord,
+//     SeaOfThieves,
+//     Programming,
+//     CustomizableFilter,
+//     Cryptocurrency,
+//     Gif,
+//     Norwegian,
+//     RocketLeague,
+//     Ticketing,
+//     Survey,
+//     Roblox,
+//     ServerManagement,
+//     Steam,
+//     Trivia,
+//     Anime,
+//     Meme,
+//     Game,
+//     Fun,
+//     Economy,
+//     Utility,
+//     Moderation,
+//     Leveling,
+//     League,
+//     Overwatch,
+//     Management,
+//     Media,
+//     Runescape,
+//     Web,
+//     Customizable,
+//     Social,
+//     Stream,
+//     Dashboard,
+// }
+//
+//
+// impl IntoFilter for Vec<BotTags> {
+//     #[inline]
+//     fn into_filter(self) -> Vec<String> {
+//         self.into_iter()
+//             .map(|v| format!("tags = {:?}", v.to_string()))
+//             .collect()
+//     }
+// }

@@ -1,61 +1,48 @@
 use std::borrow::Cow;
-use std::str::FromStr;
+use std::collections::BTreeMap;
+use std::sync::Arc;
+use arc_swap::ArcSwap;
 
 #[cfg(feature = "bincode")]
 use bincode::{Decode, Encode};
+use once_cell::sync::OnceCell;
 
-use poem_openapi::registry::{MetaSchema, MetaSchemaRef};
+use poem_openapi::registry::MetaSchemaRef;
 use poem_openapi::types::{ParseError, ParseFromJSON, ParseResult, ToJSON, Type};
 use scylla::cql_to_rust::{FromCqlVal, FromCqlValError};
 use scylla::frame::response::result::CqlValue;
 use scylla::frame::value::{Value, ValueTooBig};
-use strum::{AsRefStr, Display, EnumIter, EnumString, EnumVariantNames, IntoStaticStr};
 
-use crate::tags::IntoFilter;
+use crate::tags::{Flag, from_named_flags, to_named_flags};
+
+static LOADED_PACK_TAGS: OnceCell<ArcSwap<BTreeMap<String, Flag>>> = OnceCell::new();
+
+pub fn get_pack_tags() -> &'static ArcSwap<BTreeMap<String, Flag>> {
+    LOADED_PACK_TAGS.get_or_init(ArcSwap::default)
+}
+
+pub fn set_pack_tags(lookup: BTreeMap<String, Flag>) {
+    let swap = LOADED_PACK_TAGS.get_or_init(ArcSwap::default);
+    swap.store(Arc::new(lookup));
+}
 
 #[cfg_attr(feature = "bincode", derive(Encode, Decode))]
-#[derive(
-    Copy,
-    Clone,
-    EnumString,
-    EnumIter,
-    AsRefStr,
-    Display,
-    EnumVariantNames,
-    IntoStaticStr,
-    Debug,
-    serde::Serialize,
-    serde::Deserialize,
-    PartialEq,
-    Eq,
-    Hash,
-)]
-#[strum(serialize_all = "kebab_case", ascii_case_insensitive)]
-#[serde(rename_all = "kebab-case")]
-pub enum PackTags {
-    Games,
-    Utility,
-    Fun,
-    Social,
-    Language,
-    Economy,
-    Moderation,
-    Media,
-    Useful,
-    Educational,
+#[derive(Default)]
+pub struct PackTags {
+    inner: Vec<String>,
 }
 
 impl Type for PackTags {
     const IS_REQUIRED: bool = false;
     type RawValueType = Self;
-    type RawElementValueType = Self;
+    type RawElementValueType = <Vec<String> as Type>::RawElementValueType;
 
     fn name() -> Cow<'static, str> {
-        Cow::from("PackTags")
+        Cow::from("Tags<PackTag>")
     }
 
     fn schema_ref() -> MetaSchemaRef {
-        MetaSchemaRef::Inline(Box::new(MetaSchema::new("PackTags")))
+        Vec::<String>::schema_ref()
     }
 
     fn as_raw_value(&self) -> Option<&Self::RawValueType> {
@@ -65,56 +52,90 @@ impl Type for PackTags {
     fn raw_element_iter<'a>(
         &'a self,
     ) -> Box<dyn Iterator<Item = &'a Self::RawElementValueType> + 'a> {
-        Box::new(vec![self].into_iter())
+        self.inner.raw_element_iter()
     }
 }
 
 impl ParseFromJSON for PackTags {
     fn parse_from_json(value: Option<serde_json::Value>) -> ParseResult<Self> {
-        if let Some(v) = value {
-            match v {
-                serde_json::Value::String(v) => {
-                    Self::from_str(&v).map_err(ParseError::custom)
-                },
-                _ => Err(ParseError::custom("Invalid tag")),
-            }
+        if let Some(val) = value {
+            let flags = match val {
+                serde_json::Value::Array(v) => v,
+                other => return Err(ParseError::custom(format!("Cannot derive tags from {:?}", &other))),
+            };
+
+            let inner = flags.into_iter()
+                .flat_map(|v| v.as_str().map(|v| v.to_string()))
+                .collect();
+
+            Ok(Self {
+                inner
+            })
         } else {
-            Err(ParseError::custom("Invalid tag"))
+            Err(ParseError::custom("Cannot derive tags from null."))
         }
     }
 }
 
 impl ToJSON for PackTags {
     fn to_json(&self) -> Option<serde_json::Value> {
-        Some(self.to_string().into())
+        self.inner.to_json()
     }
 }
 
 impl Value for PackTags {
     fn serialize(&self, buf: &mut Vec<u8>) -> Result<(), ValueTooBig> {
-        let s: &str = self.as_ref();
-        s.serialize(buf)
+        let lookup = get_pack_tags();
+        let flags = from_named_flags(&self.inner, lookup.load().as_ref());
+
+        CqlValue::Varint(flags).serialize(buf)?;
+
+        Ok(())
     }
 }
 
 impl FromCqlVal<CqlValue> for PackTags {
     fn from_cql(cql_val: CqlValue) -> Result<Self, FromCqlValError> {
-        let data = match cql_val {
-            CqlValue::Text(tag) => {
-                Self::from_str(&tag).map_err(|_| FromCqlValError::BadCqlType)?
-            },
-            _ => return Err(FromCqlValError::BadCqlType),
+        let inst = if let CqlValue::Varint(flags) = cql_val {
+            let lookup = get_pack_tags();
+            let inner = to_named_flags(&flags, lookup.load().as_ref());
+            Self { inner }
+        } else {
+            Self::default()
         };
 
-        Ok(data)
+        Ok(inst)
     }
 }
 
-impl IntoFilter for Vec<PackTags> {
-    #[inline]
-    fn into_filter(self) -> Vec<String> {
-        self.into_iter()
-            .map(|v| format!("tags = {:?}", v.to_string()))
-            .collect()
-    }
-}
+// #[cfg_attr(feature = "bincode", derive(Encode, Decode))]
+// #[derive(
+//     Copy,
+//     Clone,
+//     EnumString,
+//     EnumIter,
+//     AsRefStr,
+//     Display,
+//     EnumVariantNames,
+//     IntoStaticStr,
+//     Debug,
+//     serde::Serialize,
+//     serde::Deserialize,
+//     PartialEq,
+//     Eq,
+//     Hash,
+// )]
+// #[strum(serialize_all = "kebab_case", ascii_case_insensitive)]
+// #[serde(rename_all = "kebab-case")]
+// pub enum PackTags {
+//     Games,
+//     Utility,
+//     Fun,
+//     Social,
+//     Language,
+//     Economy,
+//     Moderation,
+//     Media,
+//     Useful,
+//     Educational,
+// }
