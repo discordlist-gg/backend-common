@@ -13,7 +13,6 @@ use poem_openapi::types::{ParseError, ParseFromJSON, ParseResult, ToJSON, Type};
 use scylla::cql_to_rust::{FromCqlVal, FromCqlValError};
 use scylla::frame::response::result::CqlValue;
 use scylla::frame::value::{Value, ValueTooBig};
-use serde::{Deserializer, Serializer};
 
 use crate::tags::{Flag, from_named_flags, to_named_flags};
 
@@ -42,15 +41,15 @@ impl Debug for PackTags {
 
 impl serde::Serialize for PackTags {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
+        where S: serde::Serializer
     {
-        self.inner.serialize(serializer)
+        serde::Serialize::serialize(&self.inner, serializer)
     }
 }
 
 impl<'de> serde::Deserialize<'de> for PackTags {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> 
-        where D: Deserializer<'de>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: serde::Deserializer<'de>
     {
         let inner: Vec<String> = Vec::deserialize(deserializer)?;
         Ok(Self {
