@@ -15,7 +15,7 @@ use scylla::cql_to_rust::{FromCqlVal, FromCqlValError};
 use scylla::frame::response::result::CqlValue;
 use scylla::frame::value::{Value, ValueTooBig};
 
-use crate::tags::{Flag, from_named_flags, to_named_flags};
+use crate::tags::{BotTags, Flag, from_named_flags, IntoFilter, to_named_flags};
 
 static LOADED_PACK_TAGS: OnceCell<ArcSwap<BTreeMap<String, Flag>>> = OnceCell::new();
 
@@ -136,6 +136,16 @@ impl FromCqlVal<CqlValue> for PackTags {
         };
 
         Ok(inst)
+    }
+}
+
+impl IntoFilter for PackTags {
+    #[inline]
+    fn into_filter(self) -> Vec<String> {
+        self.inner
+            .iter()
+            .map(|v| format!("tags = {:?}", v))
+            .collect()
     }
 }
 
