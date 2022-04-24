@@ -38,7 +38,7 @@ pub struct BotTags {
 }
 
 impl Deref for BotTags {
-    type Target = Vec<String>;
+    type Target = [String];
 
     fn deref(&self) -> &Self::Target {
         &self.inner

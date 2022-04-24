@@ -35,7 +35,7 @@ pub struct PackTags {
 }
 
 impl Deref for PackTags {
-    type Target = Vec<String>;
+    type Target = [String];
 
     fn deref(&self) -> &Self::Target {
         &self.inner
