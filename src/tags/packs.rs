@@ -7,6 +7,7 @@ use arc_swap::ArcSwap;
 
 #[cfg(feature = "bincode")]
 use bincode::{Decode, Encode};
+use num_bigint::BigInt;
 use once_cell::sync::OnceCell;
 
 use poem_openapi::registry::MetaSchemaRef;
@@ -32,6 +33,19 @@ pub fn set_pack_tags(lookup: BTreeMap<String, Flag>) {
 #[derive(Default, Clone)]
 pub struct PackTags {
     inner: Vec<String>,
+}
+
+impl PackTags {
+    pub fn from_flags(flags: &BigInt) -> Self {
+        let lookup = get_pack_tags();
+        let inner = to_named_flags(flags, lookup.load().as_ref());
+        Self { inner }
+    }
+
+    pub fn to_flags(&self) -> BigInt {
+        let lookup = get_pack_tags();
+        from_named_flags(&self.inner, lookup.load().as_ref())
+    }
 }
 
 impl Deref for PackTags {
@@ -128,9 +142,7 @@ impl Value for PackTags {
 impl FromCqlVal<CqlValue> for PackTags {
     fn from_cql(cql_val: CqlValue) -> Result<Self, FromCqlValError> {
         let inst = if let CqlValue::Varint(flags) = cql_val {
-            let lookup = get_pack_tags();
-            let inner = to_named_flags(&flags, lookup.load().as_ref());
-            Self { inner }
+            Self::from_flags(&flags)
         } else {
             Self::default()
         };
@@ -146,6 +158,42 @@ impl IntoFilter for PackTags {
             .iter()
             .map(|v| format!("tags = {:?}", v))
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn lookup() {
+        let items = vec![
+            ("Music".into(), Flag { depreciated: false, flag: 1u64.into() }),
+            ("Moderation".into(), Flag { depreciated: false, flag: 2u64.into() }),
+            ("Utility".into(), Flag { depreciated: false, flag: 4u64.into() }),
+        ];
+
+        set_pack_tags(BTreeMap::from_iter(items))
+    }
+
+    #[test]
+    fn test_setting_flags() {
+        lookup();
+
+        let sample = serde_json::to_value("Music").unwrap();
+        let tags = PackTags::parse_from_json(Some(sample)).expect("Successful parse from JSON Value.");
+
+        assert_eq!(tags.inner, vec!["Music"]);
+        assert_eq!(tags.to_flags(), 1u64.into());
+    }
+
+    #[test]
+    fn test_loading_flags() {
+        lookup();
+
+        let tags = PackTags::from_flags(&(2u64.into()));
+
+        assert_eq!(tags.inner, vec!["Moderation"]);
+        assert_eq!(tags.to_flags(), 2u64.into());
     }
 }
 

@@ -7,6 +7,7 @@ use arc_swap::ArcSwap;
 
 #[cfg(feature = "bincode")]
 use bincode::{Decode, Encode};
+use num_bigint::BigInt;
 use once_cell::sync::OnceCell;
 
 use poem_openapi::registry::MetaSchemaRef;
@@ -17,6 +18,7 @@ use scylla::frame::value::{Value, ValueTooBig};
 
 use crate::tags::handler::from_named_flags;
 use crate::tags::{Flag, IntoFilter, to_named_flags};
+use crate::tags::packs::get_pack_tags;
 
 
 static LOADED_BOT_TAGS: OnceCell<ArcSwap<BTreeMap<String, Flag>>> = OnceCell::new();
@@ -35,6 +37,19 @@ pub fn set_bot_tags(lookup: BTreeMap<String, Flag>) {
 #[derive(Default, Clone)]
 pub struct BotTags {
     inner: Vec<String>,
+}
+
+impl BotTags {
+    pub fn from_flags(flags: &BigInt) -> Self {
+        let lookup = get_bot_tags();
+        let inner = to_named_flags(flags, lookup.load().as_ref());
+        Self { inner }
+    }
+
+    pub fn to_flags(&self) -> BigInt {
+        let lookup = get_bot_tags();
+        from_named_flags(&self.inner, lookup.load().as_ref())
+    }
 }
 
 impl Deref for BotTags {
@@ -102,8 +117,12 @@ impl ParseFromJSON for BotTags {
                 other => return Err(ParseError::custom(format!("Cannot derive tags from {:?}", &other))),
             };
 
+            let lookup = get_pack_tags();
+            let tags = lookup.load();
+
             let inner = flags.into_iter()
-                .flat_map(|v| v.as_str().map(|v| v.to_string()))
+                .filter_map(|v| v.as_str().map(|v| v.to_string()))
+                .filter(|name| tags.contains_key(name))
                 .collect();
 
             Ok(Self {
@@ -156,6 +175,41 @@ impl IntoFilter for BotTags {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn lookup() {
+        let items = vec![
+            ("Music".into(), Flag { depreciated: false, flag: 1u64.into() }),
+            ("Moderation".into(), Flag { depreciated: false, flag: 2u64.into() }),
+            ("Utility".into(), Flag { depreciated: false, flag: 4u64.into() }),
+        ];
+
+        set_bot_tags(BTreeMap::from_iter(items))
+    }
+
+    #[test]
+    fn test_setting_flags() {
+        lookup();
+
+        let sample = serde_json::to_value(vec!["Music", "Hello", "Utility"]).unwrap();
+        let tags = BotTags::parse_from_json(Some(sample)).expect("Successful parse from JSON Value.");
+
+        assert_eq!(tags.inner, vec!["Music", "Utility"]);
+        assert_eq!(tags.to_flags(), 5u64.into());
+    }
+
+    #[test]
+    fn test_loading_flags() {
+        lookup();
+
+        let tags = BotTags::from_flags(&(7u64.into()));
+
+        assert_eq!(tags.inner, vec!["Moderation", "Music", "Utility"]);
+        assert_eq!(tags.to_flags(), 7u64.into());
+    }
+}
 
 // #[cfg_attr(feature = "bincode", derive(Encode, Decode))]
 // #[derive(
