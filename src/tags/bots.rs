@@ -139,7 +139,11 @@ impl ParseFromJSON for BotTags {
 
 impl ToJSON for BotTags {
     fn to_json(&self) -> Option<serde_json::Value> {
-        self.inner.to_json()
+        self.inner
+            .iter()
+            .map(|v| v.name.clone())
+            .collect::<Vec<_>>()
+            .to_json()
     }
 }
 

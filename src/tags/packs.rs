@@ -134,7 +134,10 @@ impl ParseFromJSON for PackTags {
 
 impl ToJSON for PackTags {
     fn to_json(&self) -> Option<serde_json::Value> {
-        self.inner.to_json()
+        self.inner
+            .get(0)
+            .map(|v| v.name.clone())
+            .to_json()
     }
 }
 
