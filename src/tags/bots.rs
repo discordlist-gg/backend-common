@@ -123,10 +123,16 @@ impl ParseFromJSON for BotTags {
             let lookup = get_bot_tags();
             let tags = lookup.load();
 
-            let inner = flags.into_iter()
-                .filter_map(|name| tags.get(&name).map(|v| (name, v)))
-                .map(|(name, val)| VisibleTag { name, category: val.category.clone() })
-                .collect();
+            let mut inner = vec![];
+            for flag_name in flags {
+                let flag = match tags.get(&flag_name) {
+                    Some(v) => v,
+                    None => return Err(ParseError::custom(format!("Unknown tag: {:?}", flag_name)))
+                };
+
+                let visible = VisibleTag { name: flag_name, category: flag.category.clone() };
+                inner.push(visible)
+            }
 
             Ok(Self {
                 inner
@@ -203,7 +209,11 @@ mod tests {
     fn test_setting_flags() {
         lookup();
 
+
         let sample = serde_json::to_value(vec!["Music", "Hello", "Utility"]).unwrap();
+        assert!(BotTags::parse_from_json(Some(sample)).is_err());
+
+        let sample = serde_json::to_value(vec!["Music", "Utility"]).unwrap();
         let tags = BotTags::parse_from_json(Some(sample)).expect("Successful parse from JSON Value.");
 
         assert_eq!(

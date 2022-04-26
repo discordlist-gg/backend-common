@@ -120,7 +120,7 @@ impl ParseFromJSON for PackTags {
 
             let (name, flag) = match maybe_found {
                 Some(flag) => flag,
-                None => return Err(ParseError::custom(format!("Cannot derive tags from value: {}", &val))),
+                None => return Err(ParseError::custom(format!("Unknown tag: {}", &val))),
             };
 
             Ok(Self {
