@@ -10,15 +10,14 @@ use bincode::{Decode, Encode};
 use num_bigint::BigInt;
 use once_cell::sync::OnceCell;
 
-use poem_openapi::registry::MetaSchemaRef;
+use poem_openapi::registry::{MetaSchemaRef, Registry};
 use poem_openapi::types::{ParseError, ParseFromJSON, ParseResult, ToJSON, Type};
 use scylla::cql_to_rust::{FromCqlVal, FromCqlValError};
 use scylla::frame::response::result::CqlValue;
 use scylla::frame::value::{Value, ValueTooBig};
 
 use crate::tags::handler::from_named_flags;
-use crate::tags::{Flag, IntoFilter, to_named_flags};
-use crate::tags::packs::get_pack_tags;
+use crate::tags::{Flag, IntoFilter, to_named_flags, VisibleTag};
 
 
 static LOADED_BOT_TAGS: OnceCell<ArcSwap<BTreeMap<String, Flag>>> = OnceCell::new();
@@ -36,7 +35,7 @@ pub fn set_bot_tags(lookup: BTreeMap<String, Flag>) {
 #[cfg_attr(feature = "bincode", derive(Encode, Decode))]
 #[derive(Default, Clone)]
 pub struct BotTags {
-    inner: Vec<String>,
+    inner: Vec<VisibleTag>,
 }
 
 impl BotTags {
@@ -48,12 +47,12 @@ impl BotTags {
 
     pub fn to_flags(&self) -> BigInt {
         let lookup = get_bot_tags();
-        from_named_flags(&self.inner, lookup.load().as_ref())
+        from_named_flags(self.inner.iter().map(|v| &v.name), lookup.load().as_ref())
     }
 }
 
 impl Deref for BotTags {
-    type Target = [String];
+    type Target = [VisibleTag];
 
     fn deref(&self) -> &Self::Target {
         &self.inner
@@ -78,7 +77,7 @@ impl<'de> serde::Deserialize<'de> for BotTags {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where D: serde::Deserializer<'de>
     {
-        let inner: Vec<String> = Vec::deserialize(deserializer)?;
+        let inner: Vec<VisibleTag> = Vec::deserialize(deserializer)?;
         Ok(Self {
             inner
         })
@@ -88,7 +87,7 @@ impl<'de> serde::Deserialize<'de> for BotTags {
 impl Type for BotTags {
     const IS_REQUIRED: bool = false;
     type RawValueType = Self;
-    type RawElementValueType = <Vec<String> as Type>::RawElementValueType;
+    type RawElementValueType = <Vec<VisibleTag> as Type>::RawElementValueType;
 
     fn name() -> Cow<'static, str> {
         Cow::from("Tags<BotTag>")
@@ -102,6 +101,10 @@ impl Type for BotTags {
         Some(self)
     }
 
+    fn register(registry: &mut Registry) {
+        <VisibleTag as Type>::register(registry)
+    }
+
     fn raw_element_iter<'a>(
         &'a self,
     ) -> Box<dyn Iterator<Item = &'a Self::RawElementValueType> + 'a> {
@@ -112,17 +115,17 @@ impl Type for BotTags {
 impl ParseFromJSON for BotTags {
     fn parse_from_json(value: Option<serde_json::Value>) -> ParseResult<Self> {
         if let Some(val) = value {
-            let flags = match val {
-                serde_json::Value::Array(v) => v,
-                other => return Err(ParseError::custom(format!("Cannot derive tags from {:?}", &other))),
+            let flags: Vec<String> = match serde_json::from_value(val) {
+                Ok(flags) => flags,
+                Err(e) => return Err(ParseError::custom(format!("Cannot derive tags: {}", e))),
             };
 
-            let lookup = get_pack_tags();
+            let lookup = get_bot_tags();
             let tags = lookup.load();
 
             let inner = flags.into_iter()
-                .filter_map(|v| v.as_str().map(|v| v.to_string()))
-                .filter(|name| tags.contains_key(name))
+                .filter_map(|name| tags.get(&name).map(|v| (name, v)))
+                .map(|(name, val)| VisibleTag { name, category: val.category.clone() })
                 .collect();
 
             Ok(Self {
@@ -143,7 +146,10 @@ impl ToJSON for BotTags {
 impl Value for BotTags {
     fn serialize(&self, buf: &mut Vec<u8>) -> Result<(), ValueTooBig> {
         let lookup = get_bot_tags();
-        let flags = from_named_flags(&self.inner, lookup.load().as_ref());
+        let flags = from_named_flags(
+            self.inner.iter().map(|v| &v.name),
+            lookup.load().as_ref(),
+        );
 
         CqlValue::Varint(flags).serialize(buf)?;
 
@@ -181,9 +187,9 @@ mod tests {
 
     fn lookup() {
         let items = vec![
-            ("Music".into(), Flag { depreciated: false, flag: 1u64.into() }),
-            ("Moderation".into(), Flag { depreciated: false, flag: 2u64.into() }),
-            ("Utility".into(), Flag { depreciated: false, flag: 4u64.into() }),
+            ("Music".into(), Flag { depreciated: false, flag: 1u64.into(), category: "".to_string() }),
+            ("Moderation".into(), Flag { depreciated: false, flag: 2u64.into(), category: "".to_string() }),
+            ("Utility".into(), Flag { depreciated: false, flag: 4u64.into(), category: "".to_string() }),
         ];
 
         set_bot_tags(BTreeMap::from_iter(items))
@@ -196,7 +202,13 @@ mod tests {
         let sample = serde_json::to_value(vec!["Music", "Hello", "Utility"]).unwrap();
         let tags = BotTags::parse_from_json(Some(sample)).expect("Successful parse from JSON Value.");
 
-        assert_eq!(tags.inner, vec!["Music", "Utility"]);
+        assert_eq!(
+            tags.inner,
+            vec![
+                VisibleTag { name: "Music".to_string(), category: "".to_string() },
+                VisibleTag { name: "Utility".to_string(), category: "".to_string() },
+            ],
+        );
         assert_eq!(tags.to_flags(), 5u64.into());
     }
 
@@ -206,7 +218,14 @@ mod tests {
 
         let tags = BotTags::from_flags(&(7u64.into()));
 
-        assert_eq!(tags.inner, vec!["Moderation", "Music", "Utility"]);
+        assert_eq!(
+            tags.inner,
+            vec![
+                VisibleTag { name: "Moderation".to_string(), category: "".to_string() },
+                VisibleTag { name: "Music".to_string(), category: "".to_string() },
+                VisibleTag { name: "Utility".to_string(), category: "".to_string() },
+            ],
+        );
         assert_eq!(tags.to_flags(), 7u64.into());
     }
 }
