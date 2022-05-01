@@ -7,7 +7,6 @@ use arc_swap::ArcSwap;
 
 #[cfg(feature = "bincode")]
 use bincode::{Decode, Encode};
-use num_bigint::BigInt;
 use once_cell::sync::OnceCell;
 
 use poem_openapi::registry::{MetaSchemaRef, Registry};
@@ -16,8 +15,7 @@ use scylla::cql_to_rust::{FromCqlVal, FromCqlValError};
 use scylla::frame::response::result::CqlValue;
 use scylla::frame::value::{Value, ValueTooBig};
 
-use crate::tags::handler::from_named_flags;
-use crate::tags::{Flag, IntoFilter, to_named_flags, VisibleTag};
+use crate::tags::{Flag, IntoFilter, filter_valid_tags, VisibleTag};
 
 
 static LOADED_BOT_TAGS: OnceCell<ArcSwap<BTreeMap<String, Flag>>> = OnceCell::new();
@@ -39,15 +37,17 @@ pub struct BotTags {
 }
 
 impl BotTags {
-    pub fn from_flags(flags: &BigInt) -> Self {
+    pub fn from_raw(flags: &[String]) -> Self {
         let lookup = get_bot_tags();
-        let inner = to_named_flags(flags, lookup.load().as_ref());
+        let inner = filter_valid_tags(flags.iter(), lookup.load().as_ref());
         Self { inner }
     }
 
-    pub fn to_flags(&self) -> BigInt {
-        let lookup = get_bot_tags();
-        from_named_flags(self.inner.iter().map(|v| &v.name), lookup.load().as_ref())
+    pub fn as_raw(&self) -> Vec<String> {
+        self.inner
+            .iter()
+            .map(|v| v.name.to_string())
+            .collect()
     }
 }
 
@@ -155,13 +155,8 @@ impl ToJSON for BotTags {
 
 impl Value for BotTags {
     fn serialize(&self, buf: &mut Vec<u8>) -> Result<(), ValueTooBig> {
-        let lookup = get_bot_tags();
-        let flags = from_named_flags(
-            self.inner.iter().map(|v| &v.name),
-            lookup.load().as_ref(),
-        );
-
-        CqlValue::Varint(flags).serialize(buf)?;
+        let flags = self.as_raw();
+        flags.serialize(buf)?;
 
         Ok(())
     }
@@ -169,15 +164,21 @@ impl Value for BotTags {
 
 impl FromCqlVal<CqlValue> for BotTags {
     fn from_cql(cql_val: CqlValue) -> Result<Self, FromCqlValError> {
-        let inst = if let CqlValue::Varint(flags) = cql_val {
-            let lookup = get_bot_tags();
-            let inner = to_named_flags(&flags, lookup.load().as_ref());
-            Self { inner }
-        } else {
-            Self::default()
+        let values = match cql_val {
+            CqlValue::Set(items) => items,
+            _ => return Ok(Self::default())
         };
 
-        Ok(inst)
+        let iter = values
+            .iter()
+            .filter_map(|v| v.as_text());
+
+        let lookup = get_bot_tags();
+        let inner = filter_valid_tags(iter, lookup.load().as_ref());
+
+        Ok(Self {
+            inner
+        })
     }
 }
 
@@ -197,9 +198,9 @@ mod tests {
 
     fn lookup() {
         let items = vec![
-            ("Music".into(), Flag { depreciated: false, flag: 1u64.into(), category: "".to_string() }),
-            ("Moderation".into(), Flag { depreciated: false, flag: 2u64.into(), category: "".to_string() }),
-            ("Utility".into(), Flag { depreciated: false, flag: 4u64.into(), category: "".to_string() }),
+            ("Music".into(), Flag { category: "".to_string() }),
+            ("Moderation".into(), Flag { category: "".to_string() }),
+            ("Utility".into(), Flag { category: "".to_string() }),
         ];
 
         set_bot_tags(BTreeMap::from_iter(items))
@@ -223,24 +224,29 @@ mod tests {
                 VisibleTag { name: "Utility".to_string(), category: "".to_string() },
             ],
         );
-        assert_eq!(tags.to_flags(), 5u64.into());
     }
 
     #[test]
     fn test_loading_flags() {
         lookup();
 
-        let tags = BotTags::from_flags(&(7u64.into()));
+        let sample = vec![
+            "Music".into(),
+            "Moderation".into(),
+            "Utility".into(),
+            "Cheese".into(),
+        ];
+
+        let tags = BotTags::from_raw(&sample);
 
         assert_eq!(
             tags.inner,
             vec![
-                VisibleTag { name: "Moderation".to_string(), category: "".to_string() },
                 VisibleTag { name: "Music".to_string(), category: "".to_string() },
+                VisibleTag { name: "Moderation".to_string(), category: "".to_string() },
                 VisibleTag { name: "Utility".to_string(), category: "".to_string() },
             ],
         );
-        assert_eq!(tags.to_flags(), 7u64.into());
     }
 }
 

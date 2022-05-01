@@ -1,6 +1,4 @@
-use std::borrow::Borrow;
 use std::collections::BTreeMap;
-use num_bigint::BigInt;
 use poem_openapi::Object;
 
 #[cfg(feature = "bincode")]
@@ -15,35 +13,20 @@ pub struct VisibleTag {
 
 #[derive(Debug)]
 pub struct Flag {
-    pub flag: BigInt,
     pub category: String,
-    pub depreciated: bool,
 }
 
-pub fn to_named_flags(flags: &BigInt, lookup: &BTreeMap<String, Flag>) -> Vec<VisibleTag> {
-    let zero = BigInt::from(0u8);
+pub fn is_valid_tag(flag: &str, lookup: &BTreeMap<String, Flag>) -> bool {
+    lookup.contains_key(flag)
+}
+
+pub fn filter_valid_tags<'a>(flags: impl Iterator<Item = &'a String>, lookup: &BTreeMap<String, Flag>) -> Vec<VisibleTag> {
     let mut named = vec![];
-    for (key, value) in lookup {
-        if !value.depreciated && (flags & value.flag.borrow()) != zero {
-            named.push(VisibleTag { name: key.to_string(), category: value.category.clone() });
+    for name in flags {
+        if let Some(flag) = lookup.get(name) {
+            named.push(VisibleTag { name: name.to_string(), category: flag.category.clone() });
         }
     }
 
     named
-}
-
-pub fn from_named_flags<'a>(
-    named: impl Iterator<Item = &'a String>,
-    lookup: &BTreeMap<String, Flag>,
-) -> BigInt {
-    let mut flags = BigInt::from(0u8);
-    for named_flag in named {
-        if let Some(val) = lookup.get(named_flag) {
-            if !val.depreciated {
-                flags |= val.flag.borrow();
-            }
-        }
-    }
-
-    flags
 }

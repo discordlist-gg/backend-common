@@ -7,7 +7,6 @@ use arc_swap::ArcSwap;
 
 #[cfg(feature = "bincode")]
 use bincode::{Decode, Encode};
-use num_bigint::BigInt;
 use once_cell::sync::OnceCell;
 
 use poem_openapi::registry::{MetaSchemaRef, Registry};
@@ -16,7 +15,8 @@ use scylla::cql_to_rust::{FromCqlVal, FromCqlValError};
 use scylla::frame::response::result::CqlValue;
 use scylla::frame::value::{Value, ValueTooBig};
 
-use crate::tags::{Flag, from_named_flags, IntoFilter, to_named_flags, VisibleTag};
+use crate::tags::{Flag, IntoFilter, VisibleTag};
+use crate::tags::handler::is_valid_tag;
 
 static LOADED_PACK_TAGS: OnceCell<ArcSwap<BTreeMap<String, Flag>>> = OnceCell::new();
 
@@ -32,24 +32,28 @@ pub fn set_pack_tags(lookup: BTreeMap<String, Flag>) {
 #[cfg_attr(feature = "bincode", derive(Encode, Decode))]
 #[derive(Default, Clone)]
 pub struct PackTags {
-    inner: Vec<VisibleTag>,
+    inner: Option<VisibleTag>,
 }
 
 impl PackTags {
-    pub fn from_flags(flags: &BigInt) -> Self {
+    pub fn from_raw(tag: String) -> Self {
         let lookup = get_pack_tags();
-        let inner = to_named_flags(flags, lookup.load().as_ref());
-        Self { inner }
+        let tags = lookup.load();
+
+        if is_valid_tag(&tag, tags.as_ref()) {
+            Self { inner: Some(VisibleTag { name: tag, category: "".to_string() }) }
+        } else {
+            Self::default()
+        }
     }
 
-    pub fn to_flags(&self) -> BigInt {
-        let lookup = get_pack_tags();
-        from_named_flags(self.inner.iter().map(|v| &v.name), lookup.load().as_ref())
+    pub fn as_raw(&self) -> Option<String> {
+        self.inner.as_ref().map(|v| v.name.to_string())
     }
 }
 
 impl Deref for PackTags {
-    type Target = [VisibleTag];
+    type Target = Option<VisibleTag>;
 
     fn deref(&self) -> &Self::Target {
         &self.inner
@@ -74,7 +78,7 @@ impl<'de> serde::Deserialize<'de> for PackTags {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where D: serde::Deserializer<'de>
     {
-        let inner: Vec<VisibleTag> = Vec::deserialize(deserializer)?;
+        let inner: Option<VisibleTag> = Option::deserialize(deserializer)?;
         Ok(Self {
             inner
         })
@@ -124,7 +128,7 @@ impl ParseFromJSON for PackTags {
             };
 
             Ok(Self {
-                inner: vec![VisibleTag { name: name.to_string(), category: flag.category.clone() }]
+                inner: Some(VisibleTag { name: name.to_string(), category: flag.category.clone() })
             })
         } else {
             Err(ParseError::custom("Cannot derive tags from null."))
@@ -135,7 +139,7 @@ impl ParseFromJSON for PackTags {
 impl ToJSON for PackTags {
     fn to_json(&self) -> Option<serde_json::Value> {
         self.inner
-            .get(0)
+            .as_ref()
             .map(|v| v.name.clone())
             .to_json()
     }
@@ -143,13 +147,8 @@ impl ToJSON for PackTags {
 
 impl Value for PackTags {
     fn serialize(&self, buf: &mut Vec<u8>) -> Result<(), ValueTooBig> {
-        let lookup = get_pack_tags();
-        let flags = from_named_flags(
-            self.inner.iter().map(|v| &v.name),
-            lookup.load().as_ref(),
-        );
-
-        CqlValue::Varint(flags).serialize(buf)?;
+        let flags = self.as_raw();
+        flags.serialize(buf)?;
 
         Ok(())
     }
@@ -157,13 +156,17 @@ impl Value for PackTags {
 
 impl FromCqlVal<CqlValue> for PackTags {
     fn from_cql(cql_val: CqlValue) -> Result<Self, FromCqlValError> {
-        let inst = if let CqlValue::Varint(flags) = cql_val {
-            Self::from_flags(&flags)
-        } else {
-            Self::default()
+        let guard = get_pack_tags();
+        let tags = guard.load();
+
+        let slf = match cql_val {
+            CqlValue::Text(s) if is_valid_tag(&s, tags.as_ref()) => {
+                Self::from_raw(s)
+            },
+            _ => Self::default()
         };
 
-        Ok(inst)
+        Ok(slf)
     }
 }
 
@@ -183,9 +186,9 @@ mod tests {
 
     fn lookup() {
         let items = vec![
-            ("Music".into(), Flag { depreciated: false, flag: 1u64.into(), category: "".to_string() }),
-            ("Moderation".into(), Flag { depreciated: false, flag: 2u64.into(), category: "".to_string() }),
-            ("Utility".into(), Flag { depreciated: false, flag: 4u64.into(), category: "".to_string() }),
+            ("Music".into(), Flag { category: "".to_string() }),
+            ("Moderation".into(), Flag { category: "".to_string() }),
+            ("Utility".into(), Flag { category: "".to_string() }),
         ];
 
         set_pack_tags(BTreeMap::from_iter(items))
@@ -198,18 +201,16 @@ mod tests {
         let sample = serde_json::to_value("Music").unwrap();
         let tags = PackTags::parse_from_json(Some(sample)).expect("Successful parse from JSON Value.");
 
-        assert_eq!(tags.inner, vec![VisibleTag { name: "Music".to_string(), category: "".to_string() }]);
-        assert_eq!(tags.to_flags(), 1u64.into());
+        assert_eq!(tags.inner, Some(VisibleTag { name: "Music".to_string(), category: "".to_string() }));
     }
 
     #[test]
     fn test_loading_flags() {
         lookup();
 
-        let tags = PackTags::from_flags(&(2u64.into()));
+        let tags = PackTags::from_raw("Moderation-Does-Not_Exist".to_string());
 
-        assert_eq!(tags.inner, vec![VisibleTag { name: "Moderation".to_string(), category: "".to_string() }]);
-        assert_eq!(tags.to_flags(), 2u64.into());
+        assert_eq!(tags.inner, None);
     }
 }
 
