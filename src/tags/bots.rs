@@ -8,6 +8,7 @@ use arc_swap::ArcSwap;
 #[cfg(feature = "bincode")]
 use bincode::{Decode, Encode};
 use once_cell::sync::OnceCell;
+use inflector::Inflector;
 
 use poem_openapi::registry::{MetaSchemaRef, Registry};
 use poem_openapi::types::{ParseError, ParseFromJSON, ParseResult, ToJSON, Type};
@@ -125,6 +126,7 @@ impl ParseFromJSON for BotTags {
 
             let mut inner = vec![];
             for flag_name in flags {
+                let flag_name = flag_name.to_title_case();
                 let flag = match tags.get(&flag_name) {
                     Some(v) => v,
                     None => return Err(ParseError::custom(format!("Unknown tag: {:?}", flag_name)))

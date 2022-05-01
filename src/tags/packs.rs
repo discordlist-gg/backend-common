@@ -8,6 +8,7 @@ use arc_swap::ArcSwap;
 #[cfg(feature = "bincode")]
 use bincode::{Decode, Encode};
 use once_cell::sync::OnceCell;
+use inflector::Inflector;
 
 use poem_openapi::registry::{MetaSchemaRef, Registry};
 use poem_openapi::types::{ParseError, ParseFromJSON, ParseResult, ToJSON, Type};
@@ -120,7 +121,7 @@ impl ParseFromJSON for PackTags {
             let tags = lookup.load();
 
             let maybe_found = val.as_str()
-                .and_then(|v| tags.get(v).map(|f| (v, f)));
+                .and_then(|v| tags.get(&v.to_title_case()).map(|f| (v, f)));
 
             let (name, flag) = match maybe_found {
                 Some(flag) => flag,
@@ -128,7 +129,7 @@ impl ParseFromJSON for PackTags {
             };
 
             Ok(Self {
-                inner: Some(VisibleTag { name: name.to_string(), category: flag.category.clone() })
+                inner: Some(VisibleTag { name: name.to_title_case(), category: flag.category.clone() })
             })
         } else {
             Err(ParseError::custom("Cannot derive tags from null."))
