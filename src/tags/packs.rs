@@ -8,7 +8,6 @@ use arc_swap::ArcSwap;
 #[cfg(feature = "bincode")]
 use bincode::{Decode, Encode};
 use once_cell::sync::OnceCell;
-use inflector::Inflector;
 
 use poem_openapi::registry::{MetaSchemaRef, Registry};
 use poem_openapi::types::{ParseError, ParseFromJSON, ParseResult, ToJSON, Type};
@@ -17,7 +16,7 @@ use scylla::frame::response::result::CqlValue;
 use scylla::frame::value::{Value, ValueTooBig};
 
 use crate::tags::{Flag, IntoFilter, VisibleTag};
-use crate::tags::handler::is_valid_tag;
+use crate::tags::handler::get_tag;
 
 static LOADED_PACK_TAGS: OnceCell<ArcSwap<BTreeMap<String, Flag>>> = OnceCell::new();
 
@@ -41,8 +40,12 @@ impl PackTags {
         let lookup = get_pack_tags();
         let tags = lookup.load();
 
-        if is_valid_tag(&tag, tags.as_ref()) {
-            Self { inner: Some(VisibleTag { name: tag, category: "".to_string() }) }
+        if let Some(flag) = get_tag(&tag, tags.as_ref()) {
+            Self { inner: Some(VisibleTag {
+                name: tag,
+                display_name: flag.display_name.clone(),
+                category: "".to_string() ,
+            }) }
         } else {
             Self::default()
         }
@@ -121,7 +124,7 @@ impl ParseFromJSON for PackTags {
             let tags = lookup.load();
 
             let maybe_found = val.as_str()
-                .and_then(|v| tags.get(&v.to_title_case()).map(|f| (v, f)));
+                .and_then(|v| tags.get(&v.to_lowercase()).map(|f| (v, f)));
 
             let (name, flag) = match maybe_found {
                 Some(flag) => flag,
@@ -129,7 +132,11 @@ impl ParseFromJSON for PackTags {
             };
 
             Ok(Self {
-                inner: Some(VisibleTag { name: name.to_title_case(), category: flag.category.clone() })
+                inner: Some(VisibleTag {
+                    name: name.to_lowercase(),
+                    display_name: flag.display_name.to_string(),
+                    category: flag.category.clone(),
+                })
             })
         } else {
             Err(ParseError::custom("Cannot derive tags from null."))
@@ -157,12 +164,9 @@ impl Value for PackTags {
 
 impl FromCqlVal<CqlValue> for PackTags {
     fn from_cql(cql_val: CqlValue) -> Result<Self, FromCqlValError> {
-        let guard = get_pack_tags();
-        let tags = guard.load();
-
         let slf = match cql_val {
-            CqlValue::Text(s) if is_valid_tag(&s, tags.as_ref()) => {
-                Self::from_raw(s)
+            CqlValue::Text(s) => {
+                Self::from_raw(s.to_lowercase())
             },
             _ => Self::default()
         };
@@ -187,9 +191,9 @@ mod tests {
 
     fn lookup() {
         let items = vec![
-            ("Music".into(), Flag { category: "".to_string() }),
-            ("Moderation".into(), Flag { category: "".to_string() }),
-            ("Utility".into(), Flag { category: "".to_string() }),
+            ("music".into(), Flag { display_name: "Music".into(), category: "".to_string() }),
+            ("moderation".into(), Flag { display_name: "Moderation".into(), category: "".to_string() }),
+            ("utility".into(), Flag { display_name: "Utility".into(), category: "".to_string() }),
         ];
 
         set_pack_tags(BTreeMap::from_iter(items))
@@ -199,10 +203,14 @@ mod tests {
     fn test_setting_flags() {
         lookup();
 
-        let sample = serde_json::to_value("Music").unwrap();
+        let sample = serde_json::to_value("music").unwrap();
         let tags = PackTags::parse_from_json(Some(sample)).expect("Successful parse from JSON Value.");
 
-        assert_eq!(tags.inner, Some(VisibleTag { name: "Music".to_string(), category: "".to_string() }));
+        assert_eq!(tags.inner, Some(VisibleTag {
+            name: "music".to_string(),
+            display_name: "Music".to_string(),
+            category: "".to_string(),
+        }));
     }
 
     #[test]

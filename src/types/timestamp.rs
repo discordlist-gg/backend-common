@@ -13,7 +13,7 @@ use bincode::{
 };
 
 use chrono::{NaiveDateTime, Utc};
-use poem_openapi::registry::{MetaSchema, MetaSchemaRef};
+use poem_openapi::registry::MetaSchemaRef;
 use poem_openapi::types::{ParseError, ParseFromJSON, ParseResult, ToJSON, Type};
 use scylla::cql_to_rust::{FromCqlVal, FromCqlValError};
 use scylla::frame::response::result::CqlValue;
@@ -23,7 +23,6 @@ use serde::{Deserializer, Serializer};
 use serde_json::{json, Value};
 
 use crate::types::PossibleInt;
-use crate::types::PossibleInt::Str;
 
 type DateTime = chrono::DateTime<chrono::Utc>;
 
