@@ -13,7 +13,7 @@ use bincode::{
 };
 
 use chrono::{NaiveDateTime, Utc};
-use poem_openapi::registry::MetaSchemaRef;
+use poem_openapi::registry::{MetaSchema, MetaSchemaRef};
 use poem_openapi::types::{ParseError, ParseFromJSON, ParseResult, ToJSON, Type};
 use scylla::cql_to_rust::{FromCqlVal, FromCqlValError};
 use scylla::frame::response::result::CqlValue;
@@ -23,6 +23,7 @@ use serde::{Deserializer, Serializer};
 use serde_json::{json, Value};
 
 use crate::types::PossibleInt;
+use crate::types::PossibleInt::Str;
 
 type DateTime = chrono::DateTime<chrono::Utc>;
 
@@ -104,11 +105,11 @@ impl Type for Timestamp {
     type RawElementValueType = <DateTime as Type>::RawElementValueType;
 
     fn name() -> Cow<'static, str> {
-        Cow::from("Timestamp")
+        Cow::from("Timestamp<rfc3339>")
     }
 
     fn schema_ref() -> MetaSchemaRef {
-        i64::schema_ref()
+        String::schema_ref()
     }
 
     fn as_raw_value(&self) -> Option<&Self::RawValueType> {
