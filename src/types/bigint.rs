@@ -67,7 +67,7 @@ impl Deref for JsSafeBigInt {
 }
 
 impl Type for JsSafeBigInt {
-    const IS_REQUIRED: bool = <i64 as Type>::IS_REQUIRED;
+    const IS_REQUIRED: bool = <String as Type>::IS_REQUIRED;
     type RawValueType = <i64 as Type>::RawValueType;
     type RawElementValueType = <i64 as Type>::RawElementValueType;
 
@@ -76,7 +76,7 @@ impl Type for JsSafeBigInt {
     }
 
     fn schema_ref() -> MetaSchemaRef {
-        i64::schema_ref()
+        String::schema_ref()
     }
 
     fn as_raw_value(&self) -> Option<&Self::RawValueType> {
