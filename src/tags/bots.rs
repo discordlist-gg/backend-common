@@ -167,8 +167,13 @@ impl Value for BotTags {
     }
 }
 
-impl FromCqlVal<CqlValue> for BotTags {
-    fn from_cql(cql_val: CqlValue) -> Result<Self, FromCqlValError> {
+impl FromCqlVal<Option<CqlValue>> for BotTags {
+    fn from_cql(cql_val: Option<CqlValue>) -> Result<Self, FromCqlValError> {
+        let cql_val = match cql_val {
+            None => return Ok(Self::default()),
+            Some(cq) => cq,
+        };
+
         let values = match cql_val {
             CqlValue::Set(items) => items,
             _ => return Ok(Self::default())
