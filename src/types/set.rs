@@ -24,10 +24,6 @@ impl<T> Set<T> {
         self.0.push(v)
     }
 
-    #[inline]
-    pub fn contains(&self, v: &T) -> bool {
-        self.0.contains(v)
-    }
 }
 
 impl<T: PartialEq> Set<T> {
@@ -37,6 +33,11 @@ impl<T: PartialEq> Set<T> {
         }
 
         self.0.push(v);
+    }
+
+    #[inline]
+    pub fn contains(&self, v: &T) -> bool {
+        self.0.contains(v)
     }
 }
 
