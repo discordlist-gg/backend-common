@@ -18,6 +18,18 @@ use serde_json::Value;
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct Set<T>(pub Vec<T>);
 
+impl<T> Set<T> {
+    #[inline]
+    pub fn push(&mut self, v: T) {
+        self.0.push(v)
+    }
+
+    #[inline]
+    pub fn contains(&self, v: &T) -> bool {
+        self.0.contains(v)
+    }
+}
+
 impl<T: PartialEq> Set<T> {
     pub fn insert_no_dupe(&mut self, v: T) {
         if self.0.contains(&v) {
