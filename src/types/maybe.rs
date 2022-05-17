@@ -63,7 +63,7 @@ impl<T: ToJSON> ToJSON for MaybeMissing<T> {
     }
 }
 
-impl<T: ParseFromJSON + Display> ParseFromJSON for MaybeMissing<T> {
+impl<T: ParseFromJSON> ParseFromJSON for MaybeMissing<T> {
     fn parse_from_json(value: Option<Value>) -> ParseResult<Self> {
         match value {
             None => Ok(Self::Missing),
