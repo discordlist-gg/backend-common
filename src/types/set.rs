@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Deref, DerefMut};
+use std::slice::SliceIndex;
 
 #[cfg(feature = "bincode")]
 use bincode::{Decode, Encode};
@@ -61,6 +62,12 @@ impl<T> Deref for Set<T> {
 
 impl<T> DerefMut for Set<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl<T> AsMut<Vec<T>> for Set<T> {
+    fn as_mut(&mut self) -> &mut Vec<T> {
         &mut self.0
     }
 }
