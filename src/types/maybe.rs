@@ -9,6 +9,12 @@ pub enum MaybeMissing<T> {
     Missing,
 }
 
+impl<T> Default for MaybeMissing<T> {
+    fn default() -> Self {
+        Self::Missing
+    }
+}
+
 impl<T: Debug> Debug for MaybeMissing<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
