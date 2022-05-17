@@ -2,7 +2,7 @@ use poem_openapi::registry::MetaSchemaRef;
 use poem_openapi::types::{ParseError, ParseFromJSON, ParseResult, ToJSON, Type};
 use serde_json::Value;
 use std::borrow::Cow;
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::{Debug, Formatter};
 
 pub enum MaybeMissing<T> {
     Provided(T),
