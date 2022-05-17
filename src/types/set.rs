@@ -52,7 +52,7 @@ impl<T> Display for Set<T> {
 }
 
 impl<T> Deref for Set<T> {
-    type Target = Vec<T>;
+    type Target = [T];
 
     fn deref(&self) -> &Self::Target {
         &self.0
