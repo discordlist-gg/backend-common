@@ -1,9 +1,9 @@
+use arc_swap::ArcSwap;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt::{Debug, Formatter};
 use std::ops::Deref;
 use std::sync::Arc;
-use arc_swap::ArcSwap;
 
 #[cfg(feature = "bincode")]
 use bincode::{Decode, Encode};
@@ -15,8 +15,8 @@ use scylla::cql_to_rust::{FromCqlVal, FromCqlValError};
 use scylla::frame::response::result::CqlValue;
 use scylla::frame::value::{Value, ValueTooBig};
 
-use crate::tags::{Flag, IntoFilter, VisibleTag};
 use crate::tags::handler::get_tag;
+use crate::tags::{Flag, IntoFilter, VisibleTag};
 
 static LOADED_PACK_TAGS: OnceCell<ArcSwap<BTreeMap<String, Flag>>> = OnceCell::new();
 
@@ -41,11 +41,13 @@ impl PackTags {
         let tags = lookup.load();
 
         if let Some(flag) = get_tag(&tag, tags.as_ref()) {
-            Self { inner: Some(VisibleTag {
-                name: tag,
-                display_name: flag.display_name.clone(),
-                category: "".to_string() ,
-            }) }
+            Self {
+                inner: Some(VisibleTag {
+                    name: tag,
+                    display_name: flag.display_name.clone(),
+                    category: "".to_string(),
+                }),
+            }
         } else {
             Self::default()
         }
@@ -72,7 +74,8 @@ impl Debug for PackTags {
 
 impl serde::Serialize for PackTags {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: serde::Serializer
+    where
+        S: serde::Serializer,
     {
         serde::Serialize::serialize(&self.inner, serializer)
     }
@@ -80,12 +83,11 @@ impl serde::Serialize for PackTags {
 
 impl<'de> serde::Deserialize<'de> for PackTags {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: serde::Deserializer<'de>
+    where
+        D: serde::Deserializer<'de>,
     {
         let inner: Option<VisibleTag> = Option::deserialize(deserializer)?;
-        Ok(Self {
-            inner
-        })
+        Ok(Self { inner })
     }
 }
 
@@ -123,7 +125,8 @@ impl ParseFromJSON for PackTags {
             let lookup = get_pack_tags();
             let tags = lookup.load();
 
-            let maybe_found = val.as_str()
+            let maybe_found = val
+                .as_str()
                 .and_then(|v| tags.get(&v.to_lowercase()).map(|f| (v, f)));
 
             let (name, flag) = match maybe_found {
@@ -136,7 +139,7 @@ impl ParseFromJSON for PackTags {
                     name: name.to_lowercase(),
                     display_name: flag.display_name.to_string(),
                     category: flag.category.clone(),
-                })
+                }),
             })
         } else {
             Err(ParseError::custom("Cannot derive tags from null."))
@@ -146,10 +149,7 @@ impl ParseFromJSON for PackTags {
 
 impl ToJSON for PackTags {
     fn to_json(&self) -> Option<serde_json::Value> {
-        self.inner
-            .as_ref()
-            .map(|v| v.name.clone())
-            .to_json()
+        self.inner.as_ref().map(|v| v.name.clone()).to_json()
     }
 }
 
@@ -165,10 +165,8 @@ impl Value for PackTags {
 impl FromCqlVal<CqlValue> for PackTags {
     fn from_cql(cql_val: CqlValue) -> Result<Self, FromCqlValError> {
         let slf = match cql_val {
-            CqlValue::Text(s) => {
-                Self::from_raw(s.to_lowercase())
-            },
-            _ => Self::default()
+            CqlValue::Text(s) => Self::from_raw(s.to_lowercase()),
+            _ => Self::default(),
         };
 
         Ok(slf)
@@ -191,9 +189,27 @@ mod tests {
 
     fn lookup() {
         let items = vec![
-            ("music".into(), Flag { display_name: "Music".into(), category: "".to_string() }),
-            ("moderation".into(), Flag { display_name: "Moderation".into(), category: "".to_string() }),
-            ("utility".into(), Flag { display_name: "Utility".into(), category: "".to_string() }),
+            (
+                "music".into(),
+                Flag {
+                    display_name: "Music".into(),
+                    category: "".to_string(),
+                },
+            ),
+            (
+                "moderation".into(),
+                Flag {
+                    display_name: "Moderation".into(),
+                    category: "".to_string(),
+                },
+            ),
+            (
+                "utility".into(),
+                Flag {
+                    display_name: "Utility".into(),
+                    category: "".to_string(),
+                },
+            ),
         ];
 
         set_pack_tags(BTreeMap::from_iter(items))
@@ -204,13 +220,17 @@ mod tests {
         lookup();
 
         let sample = serde_json::to_value("music").unwrap();
-        let tags = PackTags::parse_from_json(Some(sample)).expect("Successful parse from JSON Value.");
+        let tags =
+            PackTags::parse_from_json(Some(sample)).expect("Successful parse from JSON Value.");
 
-        assert_eq!(tags.inner, Some(VisibleTag {
-            name: "music".to_string(),
-            display_name: "Music".to_string(),
-            category: "".to_string(),
-        }));
+        assert_eq!(
+            tags.inner,
+            Some(VisibleTag {
+                name: "music".to_string(),
+                display_name: "Music".to_string(),
+                category: "".to_string(),
+            })
+        );
     }
 
     #[test]

@@ -1,5 +1,5 @@
-use std::collections::BTreeMap;
 use poem_openapi::Object;
+use std::collections::BTreeMap;
 
 #[cfg(feature = "bincode")]
 use bincode::{Decode, Encode};
@@ -32,7 +32,7 @@ pub fn filter_valid_tags<'a>(
             named.push(VisibleTag {
                 name: name.clone(),
                 display_name: flag.display_name.clone(),
-                category: flag.category.clone()
+                category: flag.category.clone(),
             });
         }
     }

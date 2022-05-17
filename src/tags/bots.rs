@@ -1,9 +1,9 @@
+use arc_swap::ArcSwap;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt::{Debug, Formatter};
 use std::ops::Deref;
 use std::sync::Arc;
-use arc_swap::ArcSwap;
 
 #[cfg(feature = "bincode")]
 use bincode::{Decode, Encode};
@@ -15,8 +15,7 @@ use scylla::cql_to_rust::{FromCqlVal, FromCqlValError};
 use scylla::frame::response::result::CqlValue;
 use scylla::frame::value::{Value, ValueTooBig};
 
-use crate::tags::{Flag, IntoFilter, filter_valid_tags, VisibleTag};
-
+use crate::tags::{filter_valid_tags, Flag, IntoFilter, VisibleTag};
 
 static LOADED_BOT_TAGS: OnceCell<ArcSwap<BTreeMap<String, Flag>>> = OnceCell::new();
 
@@ -28,7 +27,6 @@ pub fn set_bot_tags(lookup: BTreeMap<String, Flag>) {
     let swap = LOADED_BOT_TAGS.get_or_init(ArcSwap::default);
     swap.store(Arc::new(lookup));
 }
-
 
 #[cfg_attr(feature = "bincode", derive(Encode, Decode))]
 #[derive(Default, Clone)]
@@ -44,10 +42,7 @@ impl BotTags {
     }
 
     pub fn as_raw(&self) -> Vec<String> {
-        self.inner
-            .iter()
-            .map(|v| v.name.to_string())
-            .collect()
+        self.inner.iter().map(|v| v.name.to_string()).collect()
     }
 }
 
@@ -67,7 +62,8 @@ impl Debug for BotTags {
 
 impl serde::Serialize for BotTags {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: serde::Serializer
+    where
+        S: serde::Serializer,
     {
         serde::Serialize::serialize(&self.inner, serializer)
     }
@@ -75,12 +71,11 @@ impl serde::Serialize for BotTags {
 
 impl<'de> serde::Deserialize<'de> for BotTags {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: serde::Deserializer<'de>
+    where
+        D: serde::Deserializer<'de>,
     {
         let inner: Vec<VisibleTag> = Vec::deserialize(deserializer)?;
-        Ok(Self {
-            inner
-        })
+        Ok(Self { inner })
     }
 }
 
@@ -128,7 +123,9 @@ impl ParseFromJSON for BotTags {
                 let flag_name = flag_name.to_lowercase();
                 let flag = match tags.get(&flag_name) {
                     Some(v) => v,
-                    None => return Err(ParseError::custom(format!("Unknown tag: {:?}", flag_name)))
+                    None => {
+                        return Err(ParseError::custom(format!("Unknown tag: {:?}", flag_name)))
+                    }
                 };
 
                 let visible = VisibleTag {
@@ -139,9 +136,7 @@ impl ParseFromJSON for BotTags {
                 inner.push(visible)
             }
 
-            Ok(Self {
-                inner
-            })
+            Ok(Self { inner })
         } else {
             Err(ParseError::custom("Cannot derive tags from null."))
         }
@@ -176,19 +171,15 @@ impl FromCqlVal<Option<CqlValue>> for BotTags {
 
         let values = match cql_val {
             CqlValue::Set(items) => items,
-            _ => return Ok(Self::default())
+            _ => return Ok(Self::default()),
         };
 
-        let iter = values
-            .iter()
-            .filter_map(|v| v.as_text());
+        let iter = values.iter().filter_map(|v| v.as_text());
 
         let lookup = get_bot_tags();
         let inner = filter_valid_tags(iter, lookup.load().as_ref());
 
-        Ok(Self {
-            inner
-        })
+        Ok(Self { inner })
     }
 }
 
@@ -208,9 +199,27 @@ mod tests {
 
     fn lookup() {
         let items = vec![
-            ("music".into(), Flag { display_name: "Music".into(), category: "".to_string() }),
-            ("moderation".into(), Flag { display_name: "Moderation".into(), category: "".to_string() }),
-            ("utility".into(), Flag { display_name: "Utility".into(), category: "".to_string() }),
+            (
+                "music".into(),
+                Flag {
+                    display_name: "Music".into(),
+                    category: "".to_string(),
+                },
+            ),
+            (
+                "moderation".into(),
+                Flag {
+                    display_name: "Moderation".into(),
+                    category: "".to_string(),
+                },
+            ),
+            (
+                "utility".into(),
+                Flag {
+                    display_name: "Utility".into(),
+                    category: "".to_string(),
+                },
+            ),
         ];
 
         set_bot_tags(BTreeMap::from_iter(items))
@@ -220,18 +229,26 @@ mod tests {
     fn test_setting_flags() {
         lookup();
 
-
         let sample = serde_json::to_value(vec!["music", "hello", "utility"]).unwrap();
         assert!(BotTags::parse_from_json(Some(sample)).is_err());
 
         let sample = serde_json::to_value(vec!["music", "utility"]).unwrap();
-        let tags = BotTags::parse_from_json(Some(sample)).expect("Successful parse from JSON Value.");
+        let tags =
+            BotTags::parse_from_json(Some(sample)).expect("Successful parse from JSON Value.");
 
         assert_eq!(
             tags.inner,
             vec![
-                VisibleTag { name: "music".to_string(), display_name: "Music".into(), category: "".to_string() },
-                VisibleTag { name: "utility".to_string(), display_name: "Utility".into(), category: "".to_string() },
+                VisibleTag {
+                    name: "music".to_string(),
+                    display_name: "Music".into(),
+                    category: "".to_string()
+                },
+                VisibleTag {
+                    name: "utility".to_string(),
+                    display_name: "Utility".into(),
+                    category: "".to_string()
+                },
             ],
         );
     }
@@ -252,9 +269,21 @@ mod tests {
         assert_eq!(
             tags.inner,
             vec![
-                VisibleTag { name: "music".to_string(), display_name: "Music".to_string(), category: "".to_string() },
-                VisibleTag { name: "moderation".to_string(), display_name: "Moderation".to_string(), category: "".to_string() },
-                VisibleTag { name: "utility".to_string(), display_name: "Utility".to_string(), category: "".to_string() },
+                VisibleTag {
+                    name: "music".to_string(),
+                    display_name: "Music".to_string(),
+                    category: "".to_string()
+                },
+                VisibleTag {
+                    name: "moderation".to_string(),
+                    display_name: "Moderation".to_string(),
+                    category: "".to_string()
+                },
+                VisibleTag {
+                    name: "utility".to_string(),
+                    display_name: "Utility".to_string(),
+                    category: "".to_string()
+                },
             ],
         );
     }

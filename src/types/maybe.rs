@@ -1,8 +1,8 @@
-use std::borrow::Cow;
-use std::fmt::{Debug, Display, Formatter};
 use poem_openapi::registry::MetaSchemaRef;
 use poem_openapi::types::{ParseError, ParseFromJSON, ParseResult, ToJSON, Type};
 use serde_json::Value;
+use std::borrow::Cow;
+use std::fmt::{Debug, Display, Formatter};
 
 pub enum MaybeMissing<T> {
     Provided(T),
@@ -38,10 +38,12 @@ impl<T: Type> Type for MaybeMissing<T> {
         }
     }
 
-    fn raw_element_iter<'a>(&'a self) -> Box<dyn Iterator<Item=&'a Self::RawElementValueType> + 'a> {
+    fn raw_element_iter<'a>(
+        &'a self,
+    ) -> Box<dyn Iterator<Item = &'a Self::RawElementValueType> + 'a> {
         match self {
             Self::Missing => Box::new(vec![].into_iter()),
-            Self::Provided(v) => Box::new(vec![v].into_iter())
+            Self::Provided(v) => Box::new(vec![v].into_iter()),
         }
     }
 }
@@ -60,9 +62,8 @@ impl<T: ParseFromJSON + Display> ParseFromJSON for MaybeMissing<T> {
         match value {
             None => Ok(Self::Missing),
             Some(v) => Ok(Self::Provided(
-                T::parse_from_json(Some(v))
-                    .map_err(ParseError::propagate)?
-            ))
+                T::parse_from_json(Some(v)).map_err(ParseError::propagate)?,
+            )),
         }
     }
 }

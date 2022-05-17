@@ -5,11 +5,10 @@ use std::str::FromStr;
 
 #[cfg(feature = "bincode")]
 use bincode::{
-    Decode,
-    Encode,
     de::Decoder,
     enc::Encoder,
     error::{DecodeError, EncodeError},
+    Decode, Encode,
 };
 
 use chrono::{NaiveDateTime, Utc};
@@ -130,8 +129,7 @@ impl ToJSON for Timestamp {
 
 impl ParseFromJSON for Timestamp {
     fn parse_from_json(value: Option<Value>) -> ParseResult<Self> {
-        let value =
-            value.ok_or_else(|| ParseError::custom("invalid timestamp given"))?;
+        let value = value.ok_or_else(|| ParseError::custom("invalid timestamp given"))?;
 
         if let Some(v) = value.as_i64() {
             return Ok(Self::from(v));

@@ -91,14 +91,15 @@ impl ToJSON for JsSafeInt {
 
 impl ParseFromJSON for JsSafeInt {
     fn parse_from_json(value: Option<Value>) -> ParseResult<Self> {
-        let v = value
-            .ok_or_else(|| ParseError::custom("cannot convert value into integer"))?;
+        let v = value.ok_or_else(|| ParseError::custom("cannot convert value into integer"))?;
 
         let slf = match v {
             Value::String(v) => Self::from_str(&v)?,
-            other => other.as_i64().map(|v| v as i32).map(Self).ok_or_else(|| {
-                ParseError::custom("cannot convert value into integer")
-            })?,
+            other => other
+                .as_i64()
+                .map(|v| v as i32)
+                .map(Self)
+                .ok_or_else(|| ParseError::custom("cannot convert value into integer"))?,
         };
 
         Ok(slf)

@@ -105,8 +105,8 @@ impl<T: ToJSON> ToJSON for Set<T> {
 
 impl<T: ParseFromJSON> ParseFromJSON for Set<T> {
     fn parse_from_json(value: Option<Value>) -> ParseResult<Self> {
-        let inner = Vec::<T>::parse_from_json(value)
-            .map_err(|e| ParseError::custom(e.into_message()))?;
+        let inner =
+            Vec::<T>::parse_from_json(value).map_err(|e| ParseError::custom(e.into_message()))?;
 
         Ok(Self(inner))
     }
