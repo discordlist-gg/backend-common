@@ -18,12 +18,29 @@ use scylla::frame::value::ValueTooBig;
 use serde_json::Value;
 
 #[cfg_attr(feature = "bincode", derive(Decode, Encode))]
-pub struct NormalisingString<const MIN: usize, const MAX: usize> {
+/// A string type that normalises text to ASCII from unicode.
+///
+/// This is mostly used for validations where unicode could be used to bypass some
+/// things like length checks etc...
+///
+/// This type is very verbose and generic because some behaviours might want to be adjusted.
+/// Depending on what you want the as_ref to use.
+pub struct NormalisingString<const MIN: usize, const MAX: usize, const REF_REAL: bool> {
     normalised: String,
     real: String,
 }
 
-impl<const MIN: usize, const MAX: usize> From<&str> for NormalisingString<MIN, MAX> {
+impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> AsRef<str> for NormalisingString<MIN, MAX, REF_REAL> {
+    fn as_ref(&self) -> &str {
+        if REF_REAL {
+            self.real.as_str()
+        } else {
+            self.normalised.as_str()
+        }
+    }
+}
+
+impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> From<&str> for NormalisingString<MIN, MAX, REF_REAL> {
     fn from(v: &str) -> Self {
         let normalised = deunicode::deunicode(v);
         Self {
@@ -33,25 +50,25 @@ impl<const MIN: usize, const MAX: usize> From<&str> for NormalisingString<MIN, M
     }
 }
 
-impl<const MIN: usize, const MAX: usize> From<String> for NormalisingString<MIN, MAX> {
+impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> From<String> for NormalisingString<MIN, MAX, REF_REAL> {
     fn from(real: String) -> Self {
         Self::from(real.as_str())
     }
 }
 
-impl<const MIN: usize, const MAX: usize> Display for NormalisingString<MIN, MAX> {
+impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> Display for NormalisingString<MIN, MAX, REF_REAL> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", &self.normalised)
     }
 }
 
-impl<const MIN: usize, const MAX: usize> Debug for NormalisingString<MIN, MAX> {
+impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> Debug for NormalisingString<MIN, MAX, REF_REAL> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Normalised({:?})", &self.normalised)
     }
 }
 
-impl<const MIN: usize, const MAX: usize> Deref for NormalisingString<MIN, MAX> {
+impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> Deref for NormalisingString<MIN, MAX, REF_REAL> {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
@@ -59,7 +76,7 @@ impl<const MIN: usize, const MAX: usize> Deref for NormalisingString<MIN, MAX> {
     }
 }
 
-impl<const MIN: usize, const MAX: usize> NormalisingString<MIN, MAX> {
+impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> NormalisingString<MIN, MAX, REF_REAL> {
     #[inline]
     pub fn as_raw(&self) -> &str {
         self.real.as_str()
@@ -71,7 +88,7 @@ impl<const MIN: usize, const MAX: usize> NormalisingString<MIN, MAX> {
     }
 }
 
-impl<const MIN: usize, const MAX: usize> serde::Serialize for NormalisingString<MIN, MAX> {
+impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> serde::Serialize for NormalisingString<MIN, MAX, REF_REAL> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -80,8 +97,8 @@ impl<const MIN: usize, const MAX: usize> serde::Serialize for NormalisingString<
     }
 }
 
-impl<'de, const MIN: usize, const MAX: usize> serde::Deserialize<'de>
-    for NormalisingString<MIN, MAX>
+impl<'de, const MIN: usize, const MAX: usize, const REF_REAL: bool> serde::Deserialize<'de>
+    for NormalisingString<MIN, MAX, REF_REAL>
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -92,7 +109,7 @@ impl<'de, const MIN: usize, const MAX: usize> serde::Deserialize<'de>
     }
 }
 
-impl<const MIN: usize, const MAX: usize> Type for NormalisingString<MIN, MAX> {
+impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> Type for NormalisingString<MIN, MAX, REF_REAL> {
     const IS_REQUIRED: bool = <String as Type>::IS_REQUIRED;
     type RawValueType = Self;
     type RawElementValueType = Self;
@@ -116,13 +133,13 @@ impl<const MIN: usize, const MAX: usize> Type for NormalisingString<MIN, MAX> {
     }
 }
 
-impl<const MIN: usize, const MAX: usize> ToJSON for NormalisingString<MIN, MAX> {
+impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> ToJSON for NormalisingString<MIN, MAX, REF_REAL> {
     fn to_json(&self) -> Option<Value> {
         Some(Value::String(self.real.clone()))
     }
 }
 
-impl<const MIN: usize, const MAX: usize> ParseFromJSON for NormalisingString<MIN, MAX> {
+impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> ParseFromJSON for NormalisingString<MIN, MAX, REF_REAL> {
     fn parse_from_json(value: Option<Value>) -> ParseResult<Self> {
         let value = value
             .ok_or_else(|| ParseError::custom("Expected type 'String' got null"))?
@@ -162,15 +179,15 @@ impl<const MIN: usize, const MAX: usize> ParseFromJSON for NormalisingString<MIN
     }
 }
 
-impl<const MIN: usize, const MAX: usize> FromCqlVal<CqlValue> for NormalisingString<MIN, MAX> {
+impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> FromCqlVal<CqlValue> for NormalisingString<MIN, MAX, REF_REAL> {
     fn from_cql(cql_val: CqlValue) -> Result<Self, FromCqlValError> {
         let s = String::from_cql(cql_val)?;
         Ok(Self::from(s))
     }
 }
 
-impl<const MIN: usize, const MAX: usize> scylla::frame::value::Value
-    for NormalisingString<MIN, MAX>
+impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> scylla::frame::value::Value
+    for NormalisingString<MIN, MAX, REF_REAL>
 {
     fn serialize(&self, buf: &mut Vec<u8>) -> Result<(), ValueTooBig> {
         self.real.serialize(buf)
@@ -187,7 +204,7 @@ mod tests {
     fn test_raw_length_handling() {
         let thing = "​​​​​ hi ​​";
 
-        let s = NormalisingString::<5, 20>::parse_from_json(Some(json!(thing)));
+        let s = NormalisingString::<5, 20, true>::parse_from_json(Some(json!(thing)));
         assert!(s.is_err(), "Expected length validation to fail");
     }
 
@@ -196,7 +213,7 @@ mod tests {
     fn test_normalised_length_handling() {
         let thing = "hi ​";
 
-        let s = NormalisingString::<8, 20>::parse_from_json(Some(json!(thing)));
+        let s = NormalisingString::<8, 20, true>::parse_from_json(Some(json!(thing)));
         assert!(s.is_err(), "Expected length validation to fail");
     }
 
@@ -205,7 +222,7 @@ mod tests {
     fn test_no_unicode() {
         let thing = "hi ";
 
-        let s = NormalisingString::<5, 20>::parse_from_json(Some(json!(thing)));
+        let s = NormalisingString::<5, 20, true>::parse_from_json(Some(json!(thing)));
         assert!(s.is_ok(), "Expected successful parse");
     }
 }
