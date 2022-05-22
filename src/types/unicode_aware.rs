@@ -1,7 +1,7 @@
+use serde::{Deserializer, Serializer};
 use std::borrow::Cow;
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::Deref;
-use serde::{Deserializer, Serializer};
 
 #[cfg(feature = "bincode")]
 use bincode::{
@@ -16,7 +16,6 @@ use scylla::cql_to_rust::{FromCqlVal, FromCqlValError};
 use scylla::frame::response::result::CqlValue;
 use scylla::frame::value::ValueTooBig;
 use serde_json::Value;
-
 
 #[cfg_attr(feature = "bincode", derive(Decode, Encode))]
 pub struct NormalisingString<const MIN: usize, const MAX: usize> {
@@ -81,7 +80,9 @@ impl<const MIN: usize, const MAX: usize> serde::Serialize for NormalisingString<
     }
 }
 
-impl<'de, const MIN: usize, const MAX: usize> serde::Deserialize<'de> for NormalisingString<MIN, MAX> {
+impl<'de, const MIN: usize, const MAX: usize> serde::Deserialize<'de>
+    for NormalisingString<MIN, MAX>
+{
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -90,7 +91,6 @@ impl<'de, const MIN: usize, const MAX: usize> serde::Deserialize<'de> for Normal
         Ok(Self::from(real))
     }
 }
-
 
 impl<const MIN: usize, const MAX: usize> Type for NormalisingString<MIN, MAX> {
     const IS_REQUIRED: bool = <String as Type>::IS_REQUIRED;
@@ -131,19 +131,31 @@ impl<const MIN: usize, const MAX: usize> ParseFromJSON for NormalisingString<MIN
         let slf = Self::from(value);
 
         if slf.normalised.len() < MIN {
-            return Err(ParseError::custom(format!("Normalised string value is bellow the minimum length threshold of {} characters.", MIN)))
+            return Err(ParseError::custom(format!(
+                "Normalised string value is bellow the minimum length threshold of {} characters.",
+                MIN
+            )));
         }
 
         if slf.normalised.len() > MAX {
-            return Err(ParseError::custom(format!("Normalised string value is above the maximum length threshold of {} characters.", MAX)))
+            return Err(ParseError::custom(format!(
+                "Normalised string value is above the maximum length threshold of {} characters.",
+                MAX
+            )));
         }
 
         if slf.real.len() < MIN {
-            return Err(ParseError::custom(format!("Raw string value is bellow the minimum length threshold of {} characters.", MIN)))
+            return Err(ParseError::custom(format!(
+                "Raw string value is bellow the minimum length threshold of {} characters.",
+                MIN
+            )));
         }
 
         if slf.real.len() > MAX {
-            return Err(ParseError::custom(format!("Raw string value is above the maximum length threshold of {} characters.", MAX)))
+            return Err(ParseError::custom(format!(
+                "Raw string value is above the maximum length threshold of {} characters.",
+                MAX
+            )));
         }
 
         Ok(slf)
@@ -157,18 +169,18 @@ impl<const MIN: usize, const MAX: usize> FromCqlVal<CqlValue> for NormalisingStr
     }
 }
 
-impl<const MIN: usize, const MAX: usize> scylla::frame::value::Value for NormalisingString<MIN, MAX> {
+impl<const MIN: usize, const MAX: usize> scylla::frame::value::Value
+    for NormalisingString<MIN, MAX>
+{
     fn serialize(&self, buf: &mut Vec<u8>) -> Result<(), ValueTooBig> {
         self.real.serialize(buf)
     }
 }
 
-
-
 #[cfg(test)]
 mod tests {
-    use serde_json::json;
     use super::*;
+    use serde_json::json;
 
     #[allow(clippy::invisible_characters)]
     #[test]

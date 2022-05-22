@@ -22,7 +22,6 @@ impl<T> Set<T> {
     pub fn push(&mut self, v: T) {
         self.0.push(v)
     }
-
 }
 
 impl<T: PartialEq> Set<T> {
