@@ -17,6 +17,7 @@ use scylla::frame::response::result::CqlValue;
 use scylla::frame::value::ValueTooBig;
 use serde_json::Value;
 
+#[derive(Debug)]
 #[cfg_attr(feature = "bincode", derive(Decode, Encode))]
 /// A string type that normalises text to ASCII from unicode.
 ///
@@ -59,12 +60,6 @@ impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> From<String> for 
 impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> Display for NormalisingString<MIN, MAX, REF_REAL> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", &self.normalised)
-    }
-}
-
-impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> Debug for NormalisingString<MIN, MAX, REF_REAL> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Normalised({:?})", &self.normalised)
     }
 }
 
@@ -142,8 +137,11 @@ impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> ToJSON for Normal
 impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> ParseFromJSON for NormalisingString<MIN, MAX, REF_REAL> {
     fn parse_from_json(value: Option<Value>) -> ParseResult<Self> {
         let value = value
-            .ok_or_else(|| ParseError::custom("Expected type 'String' got null"))?
-            .to_string();
+            .ok_or_else(|| ParseError::custom("Expected type 'String' got null"))?;
+
+        let value = value
+            .as_str()
+            .ok_or_else(|| ParseError::custom(format!("Expected type 'String' got {:?}", &value)))?;
 
         let slf = Self::from(value);
 
@@ -222,7 +220,7 @@ mod tests {
     fn test_no_unicode() {
         let thing = "hi ";
 
-        let s = NormalisingString::<5, 20, true>::parse_from_json(Some(json!(thing)));
+        let s = NormalisingString::<2, 20, true>::parse_from_json(Some(json!(thing)));
         assert!(s.is_ok(), "Expected successful parse");
     }
 }
