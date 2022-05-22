@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Deref, DerefMut};
-use std::slice::SliceIndex;
 
 #[cfg(feature = "bincode")]
 use bincode::{Decode, Encode};
