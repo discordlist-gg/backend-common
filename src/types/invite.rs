@@ -93,10 +93,14 @@ impl ParseFromJSON for DiscordInvite {
         let value = value.ok_or_else(|| ParseError::custom("Invalid invite given"))?;
 
         if let Some(v) = value.as_str() {
-            let v= match v {
+            let v = match v {
                 v if v.starts_with("discord.gg") => format!("https://{}", v),
                 v if v.starts_with("https://discord.gg") => v.to_string(),
-                _ => return Err(ParseError::custom("Invite must begin with 'discord.gg' prefix"))
+                _ => {
+                    return Err(ParseError::custom(
+                        "Invite must begin with 'discord.gg' prefix",
+                    ))
+                }
             };
 
             let url = Url::from_str(&v)?;

@@ -1,18 +1,18 @@
 mod bigint;
 mod integer;
-mod url;
+mod invite;
 mod set;
 mod timestamp;
 mod unicode_aware;
-mod invite;
+mod url;
 
 pub use bigint::JsSafeBigInt;
 pub use integer::JsSafeInt;
-pub use url::DiscordUrl;
 pub use invite::DiscordInvite;
 pub use set::Set;
 pub use timestamp::Timestamp;
 pub use unicode_aware::NormalisingString;
+pub use url::DiscordUrl;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(untagged)]

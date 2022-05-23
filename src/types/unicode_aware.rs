@@ -31,7 +31,9 @@ pub struct NormalisingString<const MIN: usize, const MAX: usize, const REF_REAL:
     real: String,
 }
 
-impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> AsRef<str> for NormalisingString<MIN, MAX, REF_REAL> {
+impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> AsRef<str>
+    for NormalisingString<MIN, MAX, REF_REAL>
+{
     fn as_ref(&self) -> &str {
         if REF_REAL {
             self.real.as_str()
@@ -41,7 +43,9 @@ impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> AsRef<str> for No
     }
 }
 
-impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> From<&str> for NormalisingString<MIN, MAX, REF_REAL> {
+impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> From<&str>
+    for NormalisingString<MIN, MAX, REF_REAL>
+{
     fn from(v: &str) -> Self {
         let normalised = deunicode::deunicode(v);
         Self {
@@ -51,19 +55,25 @@ impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> From<&str> for No
     }
 }
 
-impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> From<String> for NormalisingString<MIN, MAX, REF_REAL> {
+impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> From<String>
+    for NormalisingString<MIN, MAX, REF_REAL>
+{
     fn from(real: String) -> Self {
         Self::from(real.as_str())
     }
 }
 
-impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> Display for NormalisingString<MIN, MAX, REF_REAL> {
+impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> Display
+    for NormalisingString<MIN, MAX, REF_REAL>
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", &self.normalised)
     }
 }
 
-impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> Deref for NormalisingString<MIN, MAX, REF_REAL> {
+impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> Deref
+    for NormalisingString<MIN, MAX, REF_REAL>
+{
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
@@ -71,7 +81,9 @@ impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> Deref for Normali
     }
 }
 
-impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> NormalisingString<MIN, MAX, REF_REAL> {
+impl<const MIN: usize, const MAX: usize, const REF_REAL: bool>
+    NormalisingString<MIN, MAX, REF_REAL>
+{
     #[inline]
     pub fn as_raw(&self) -> &str {
         self.real.as_str()
@@ -83,7 +95,9 @@ impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> NormalisingString
     }
 }
 
-impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> serde::Serialize for NormalisingString<MIN, MAX, REF_REAL> {
+impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> serde::Serialize
+    for NormalisingString<MIN, MAX, REF_REAL>
+{
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -104,7 +118,9 @@ impl<'de, const MIN: usize, const MAX: usize, const REF_REAL: bool> serde::Deser
     }
 }
 
-impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> Type for NormalisingString<MIN, MAX, REF_REAL> {
+impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> Type
+    for NormalisingString<MIN, MAX, REF_REAL>
+{
     const IS_REQUIRED: bool = <String as Type>::IS_REQUIRED;
     type RawValueType = Self;
     type RawElementValueType = Self;
@@ -128,20 +144,23 @@ impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> Type for Normalis
     }
 }
 
-impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> ToJSON for NormalisingString<MIN, MAX, REF_REAL> {
+impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> ToJSON
+    for NormalisingString<MIN, MAX, REF_REAL>
+{
     fn to_json(&self) -> Option<Value> {
         Some(Value::String(self.real.clone()))
     }
 }
 
-impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> ParseFromJSON for NormalisingString<MIN, MAX, REF_REAL> {
+impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> ParseFromJSON
+    for NormalisingString<MIN, MAX, REF_REAL>
+{
     fn parse_from_json(value: Option<Value>) -> ParseResult<Self> {
-        let value = value
-            .ok_or_else(|| ParseError::custom("Expected type 'String' got null"))?;
+        let value = value.ok_or_else(|| ParseError::custom("Expected type 'String' got null"))?;
 
-        let value = value
-            .as_str()
-            .ok_or_else(|| ParseError::custom(format!("Expected type 'String' got {:?}", &value)))?;
+        let value = value.as_str().ok_or_else(|| {
+            ParseError::custom(format!("Expected type 'String' got {:?}", &value))
+        })?;
 
         let slf = Self::from(value);
 
@@ -177,7 +196,9 @@ impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> ParseFromJSON for
     }
 }
 
-impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> FromCqlVal<CqlValue> for NormalisingString<MIN, MAX, REF_REAL> {
+impl<const MIN: usize, const MAX: usize, const REF_REAL: bool> FromCqlVal<CqlValue>
+    for NormalisingString<MIN, MAX, REF_REAL>
+{
     fn from_cql(cql_val: CqlValue) -> Result<Self, FromCqlValError> {
         let s = String::from_cql(cql_val)?;
         Ok(Self::from(s))
