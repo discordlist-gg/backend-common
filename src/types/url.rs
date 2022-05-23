@@ -17,9 +17,9 @@ use url::Url;
 
 #[cfg_attr(feature = "bincode", derive(Decode, Encode))]
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub struct DiscordInvite(#[cfg_attr(feature = "bincode", bincode(with_serde))] pub Url);
+pub struct DiscordUrl(#[cfg_attr(feature = "bincode", bincode(with_serde))] pub Url);
 
-impl serde::Serialize for DiscordInvite {
+impl serde::Serialize for DiscordUrl {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -28,7 +28,7 @@ impl serde::Serialize for DiscordInvite {
     }
 }
 
-impl<'de> serde::Deserialize<'de> for DiscordInvite {
+impl<'de> serde::Deserialize<'de> for DiscordUrl {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -38,19 +38,19 @@ impl<'de> serde::Deserialize<'de> for DiscordInvite {
     }
 }
 
-impl Default for DiscordInvite {
+impl Default for DiscordUrl {
     fn default() -> Self {
         Self(Url::from_str("https://discordlist.gg/").unwrap())
     }
 }
 
-impl Display for DiscordInvite {
+impl Display for DiscordUrl {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-impl Deref for DiscordInvite {
+impl Deref for DiscordUrl {
     type Target = Url;
 
     fn deref(&self) -> &Self::Target {
@@ -58,7 +58,7 @@ impl Deref for DiscordInvite {
     }
 }
 
-impl Type for DiscordInvite {
+impl Type for DiscordUrl {
     const IS_REQUIRED: bool = <Url as Type>::IS_REQUIRED;
     type RawValueType = <Url as Type>::RawValueType;
     type RawElementValueType = <Url as Type>::RawElementValueType;
@@ -82,32 +82,26 @@ impl Type for DiscordInvite {
     }
 }
 
-impl ToJSON for DiscordInvite {
+impl ToJSON for DiscordUrl {
     fn to_json(&self) -> Option<Value> {
         Some(json!(self.0.to_string()))
     }
 }
 
-impl ParseFromJSON for DiscordInvite {
+impl ParseFromJSON for DiscordUrl {
     fn parse_from_json(value: Option<Value>) -> ParseResult<Self> {
-        let value = value.ok_or_else(|| ParseError::custom("Invalid invite given"))?;
+        let value = value.ok_or_else(|| ParseError::custom("invalid url given"))?;
 
         if let Some(v) = value.as_str() {
-            let v= match v {
-                v if v.starts_with("discord.gg") => format!("https://{}", v),
-                v if v.starts_with("https://discord.gg") => v.to_string(),
-                _ => return Err(ParseError::custom("Invite must begin with 'discord.gg' prefix"))
-            };
-
             let url = Url::from_str(&v)?;
             return Ok(Self(url));
         }
 
-        Err(ParseError::custom("Invalid invite given"))
+        Err(ParseError::custom("invalid url given"))
     }
 }
 
-impl FromStr for DiscordInvite {
+impl FromStr for DiscordUrl {
     type Err = poem_openapi::types::ParseError<Self>;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -116,7 +110,7 @@ impl FromStr for DiscordInvite {
     }
 }
 
-impl FromCqlVal<CqlValue> for DiscordInvite {
+impl FromCqlVal<CqlValue> for DiscordUrl {
     fn from_cql(cql_val: CqlValue) -> Result<Self, FromCqlValError> {
         if let Some(v) = cql_val.as_text() {
             Self::from_str(v).map_err(|_| FromCqlValError::BadCqlType)
@@ -126,7 +120,7 @@ impl FromCqlVal<CqlValue> for DiscordInvite {
     }
 }
 
-impl scylla::frame::value::Value for DiscordInvite {
+impl scylla::frame::value::Value for DiscordUrl {
     fn serialize(&self, buf: &mut Vec<u8>) -> Result<(), ValueTooBig> {
         self.0.as_str().serialize(buf)
     }

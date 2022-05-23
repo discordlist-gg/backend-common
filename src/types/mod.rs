@@ -1,13 +1,15 @@
 mod bigint;
 mod integer;
-mod invite;
+mod url;
 mod set;
 mod timestamp;
 mod unicode_aware;
+mod invite;
 
 pub use bigint::JsSafeBigInt;
 pub use integer::JsSafeInt;
-pub use invite::DiscordUrl;
+pub use url::DiscordUrl;
+pub use invite::DiscordInvite;
 pub use set::Set;
 pub use timestamp::Timestamp;
 pub use unicode_aware::NormalisingString;
