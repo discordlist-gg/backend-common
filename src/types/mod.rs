@@ -12,7 +12,7 @@ pub use invite::DiscordInvite;
 pub use set::Set;
 pub use timestamp::Timestamp;
 pub use unicode_aware::NormalisingString;
-pub use url::DiscordUrl;
+pub use self::url::DiscordUrl;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(untagged)]
