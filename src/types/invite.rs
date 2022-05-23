@@ -64,7 +64,7 @@ impl Type for DiscordInvite {
     type RawElementValueType = <Url as Type>::RawElementValueType;
 
     fn name() -> Cow<'static, str> {
-        Cow::from("Url")
+        Cow::from("DiscordInvite")
     }
 
     fn schema_ref() -> MetaSchemaRef {
