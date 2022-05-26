@@ -96,6 +96,7 @@ impl ParseFromJSON for DiscordInvite {
             let v = match v {
                 v if v.starts_with("discord.gg") => format!("https://{}", v),
                 v if v.starts_with("https://discord.gg") => v.to_string(),
+                v if v.starts_with("https://discord.com") => v.to_string(),
                 _ => {
                     return Err(ParseError::custom(
                         "Invite must begin with 'discord.gg' prefix",
