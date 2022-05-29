@@ -93,7 +93,12 @@ impl ParseFromJSON for DiscordUrl {
         let value = value.ok_or_else(|| ParseError::custom("invalid url given"))?;
 
         if let Some(v) = value.as_str() {
-            let url = Url::from_str(&v)?;
+            let url = Url::from_str(v)?;
+
+            if !is_valid_url(&url) {
+                return Err(ParseError::custom("Invalid url provided."))
+            }
+
             return Ok(Self(url));
         }
 
@@ -106,6 +111,11 @@ impl FromStr for DiscordUrl {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let url = Url::from_str(s)?;
+
+        if !is_valid_url(&url) {
+            return Err(ParseError::custom("Invalid url provided."))
+        }
+
         Ok(Self(url))
     }
 }
@@ -124,4 +134,64 @@ impl scylla::frame::value::Value for DiscordUrl {
     fn serialize(&self, buf: &mut Vec<u8>) -> Result<(), ValueTooBig> {
         self.0.as_str().serialize(buf)
     }
+}
+
+
+fn is_valid_url(url: &Url) -> bool {
+    (url.scheme() == "http" || url.scheme() == "https")
+        && url.username() == ""
+        && url.password().is_none()
+        && !url.cannot_be_a_base()
+        && url.domain().is_some()
+}
+
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug, serde::Serialize, serde::Deserialize)]
+pub struct ConstrainedDiscordUrl(pub DiscordUrl);
+
+
+pub mod constraints {
+    use url::Url;
+
+    #[inline]
+    fn twitter_url(url: &Url) -> bool {
+        url.domain()
+            .map(|v| v == "twitter.com")
+            .unwrap_or_default()
+    }
+
+    #[inline]
+    fn github_url(url: &Url) -> bool {
+        url.domain()
+            .map(|v| v == "github.com")
+            .unwrap_or_default()
+    }
+
+    #[inline]
+    fn instagram_url(url: &Url) -> bool {
+        url.domain()
+            .map(|v| v == "instagram.com")
+            .unwrap_or_default()
+    }
+
+
+    pub trait ConstrainedUrl {
+        fn validate(url: &Url) -> bool;
+    }
+
+    macro_rules! constraint {
+        ($name:ident, $cb:ident) => {
+            pub struct $name;
+
+            impl $crate::types::url::constraints::ConstrainedUrl for $name {
+                fn validate(url: &Url) -> bool {
+                    $crate::types::url::constraints::$cb(url)
+                }
+            }
+        };
+    }
+
+    constraint!(TwitterUrl, twitter_url);
+    constraint!(GitHubUrl, github_url);
+    constraint!(InstagramUrl, instagram_url);
 }

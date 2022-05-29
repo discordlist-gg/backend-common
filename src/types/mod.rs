@@ -4,7 +4,7 @@ mod invite;
 mod set;
 mod timestamp;
 mod unicode_aware;
-mod url;
+pub mod url;
 
 pub use bigint::JsSafeBigInt;
 pub use integer::JsSafeInt;
