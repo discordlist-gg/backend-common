@@ -270,6 +270,7 @@ pub mod constraints {
 
     macro_rules! constraint {
         ($name:ident, $cb:ident) => {
+            #[derive(Debug, Copy, Clone)]
             pub struct $name;
 
             impl $crate::types::url::constraints::ConstrainedUrl for $name {
