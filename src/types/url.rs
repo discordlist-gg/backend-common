@@ -254,7 +254,11 @@ pub mod constraints {
 
     #[inline]
     fn github_url(url: &DiscordUrl) -> bool {
-        url.domain().map(|v| v == "github.com").unwrap_or_default()
+        url.domain().map(|v| [
+            "github.com",
+            "gitlab.com",
+            "bitbucket.org",
+        ].contains(&v)).unwrap_or_default()
     }
 
     #[inline]
