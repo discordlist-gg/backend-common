@@ -249,7 +249,12 @@ pub mod constraints {
 
     #[inline]
     fn twitter_url(url: &DiscordUrl) -> bool {
-        url.domain().map(|v| v == "twitter.com").unwrap_or_default()
+        url.domain()
+            .map(|v|[
+                "twitter.com",
+                "www.twitter.com",
+            ].contains(&v))
+            .unwrap_or_default()
     }
 
     #[inline]
@@ -258,13 +263,19 @@ pub mod constraints {
             "github.com",
             "gitlab.com",
             "bitbucket.org",
+            "www.github.com",
+            "www.gitlab.com",
+            "www.bitbucket.org",
         ].contains(&v)).unwrap_or_default()
     }
 
     #[inline]
     fn instagram_url(url: &DiscordUrl) -> bool {
         url.domain()
-            .map(|v| v == "instagram.com")
+            .map(|v|[
+                "instagram.com",
+                "www.instagram.com",
+            ].contains(&v))
             .unwrap_or_default()
     }
 
