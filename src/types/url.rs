@@ -138,11 +138,17 @@ impl scylla::frame::value::Value for DiscordUrl {
 }
 
 fn is_valid_url(url: &Url) -> bool {
+    if let Some(host) = url.host_str() {
+        if host == "127.0.0.1" || host == "localhost" {
+            return false
+        }
+    }
+    
     (url.scheme() == "http" || url.scheme() == "https")
         && url.username() == ""
         && url.password().is_none()
         && !url.cannot_be_a_base()
-        && url.domain().is_some()
+        && ((url.has_host() && url.port().is_some()) || url.domain().is_some())
 }
 
 #[derive(Clone, Default, PartialEq, Eq, Hash, Debug, serde::Serialize, serde::Deserialize)]
@@ -305,6 +311,15 @@ pub mod constraints {
 mod tests {
     use super::*;
     use crate::types::url::constraints::{GitHubUrl, InstagramUrl, TwitterUrl};
+
+    #[test]
+    fn test_ip_http_url() {
+        let res = DiscordUrl::from_str("http://127.0.0.1:6000/zyxa");
+        assert!(
+            res.is_ok(),
+            "Expected url pass for raw ips."
+        );
+    }
 
     #[test]
     fn test_js_non_http_url() {
