@@ -143,7 +143,7 @@ fn is_valid_url(url: &Url) -> bool {
             return false
         }
     }
-    
+
     (url.scheme() == "http" || url.scheme() == "https")
         && url.username() == ""
         && url.password().is_none()
@@ -314,7 +314,7 @@ mod tests {
 
     #[test]
     fn test_ip_http_url() {
-        let res = DiscordUrl::from_str("http://127.0.0.1:6000/zyxa");
+        let res = DiscordUrl::from_str("http://192.168.1.2:6000/zyxa");
         assert!(
             res.is_ok(),
             "Expected url pass for raw ips."
