@@ -52,6 +52,12 @@ impl From<i64> for JsSafeBigInt {
     }
 }
 
+impl From<u64> for JsSafeBigInt {
+    fn from(v: u64) -> Self {
+        Self(v as i64)
+    }
+}
+
 impl Display for JsSafeBigInt {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
